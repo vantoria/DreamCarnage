@@ -1,0 +1,35 @@
+﻿<Properties StartupItem="Assembly-CSharp.csproj">
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="Unity.Instance.Unity Editor" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets\Scripts\BulletHell\Scripts\Player\BombController.cs">
+    <Files>
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\GameManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\UIManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\PotraitShowManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\BulletManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\PickUpManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Player\PlayerController.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Player\BombController.cs" Line="20" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Player\PlayerHitBox.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Enemy\EnemyBase.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Bullet\BulletMove.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Enemy\Enemy1.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\AttackPattern\AttackPattern.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\AttackPattern\ShootAtk.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\AttackPattern\ShootAroundInCircleAtk.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\AttackPattern\SineWaveAtk.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Bullet\PlayerBulletControl.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Editor\CustomInspector\ShootAroundInCircleAtkCI.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Editor\CustomInspector\PlayerBulletControlCI.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\TagManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\Visual Novel\Editor\CustomInspector\DialogueDataCI.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Editor\CustomInspector\EnemyBulletControlCI.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Others\PickUpValue.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\EnemyManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Enemy\MagicCirlce.cs" Line="1" Column="1" />
+    </Files>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+</Properties>

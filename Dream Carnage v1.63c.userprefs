@@ -1,0 +1,36 @@
+﻿<Properties StartupItem="Assembly-CSharp.csproj">
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="Unity.Instance.Unity Editor" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets\Scripts\BulletHell\Scripts\Manager\UIManager.cs">
+    <Files>
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\UIManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Others\MainMenuManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\GameManager.cs" Line="211" Column="35" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\JoystickManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\EnemyManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Enemy\EnemyBase.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Editor\CustomInspector\EnemyBaseCI.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Enemy\Enemy1.cs" Line="49" Column="37" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Enemy\EnemyMovement.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\BombManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Player\BombController.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\Test\BulletWipe.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Bullet\BulletMove.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\AttackPattern\AttackPattern.cs" Line="203" Column="106" />
+      <File FileName="Assets\Scripts\BulletHell\Editor\CustomInspector\AttackPatternCI.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Player\PlayerController.cs" Line="381" Column="101" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Player\ReviveController.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Player\PlayerSoul.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\TagManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\BulletManager.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\ScriptData\PlayerNEnemyPrefabData.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Manager\EnvObjManager.cs" Line="109" Column="26" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Others\EnvironmentalObject.cs" Line="113" Column="8" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\Others\ItemDropController.cs" Line="1" Column="1" />
+      <File FileName="Assets\Scripts\BulletHell\Scripts\AttackPattern\SecondaryAttackType.cs" Line="139" Column="122" />
+    </Files>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+</Properties>
