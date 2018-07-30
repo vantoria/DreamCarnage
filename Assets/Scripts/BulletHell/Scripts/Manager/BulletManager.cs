@@ -23,6 +23,8 @@ public class BulletManager : MonoBehaviour
     }
 
     public BulletPrefabData bulletPrefabData;
+//	[ReadOnlyAttribute]public int totalBulletsInPlay = 0;
+
     List<int> plyCurrMainBulIndexList = new List<int>();
     List<int> plyCurrSecondBulIndexList = new List<int>();
     List<int> enemyCurrBulIndexList = new List<int>();
@@ -31,6 +33,7 @@ public class BulletManager : MonoBehaviour
     List<List<Transform>> mPlySecondaryBulletList = new List<List<Transform>>();
     List<List<Transform>> mEnemyBulletList = new List<List<Transform>>();
 
+    int mOrderInLayer = 0;
     bool mIsDisableSpawnBullet = false;
     float mDisableSpawnBulletTimer = 0, mDisableSpawnBulletTime = 0;
 
@@ -58,6 +61,14 @@ public class BulletManager : MonoBehaviour
 
     void Update()
     {
+//		int total = 0;
+//		List<Transform> sameBulletList = mEnemyBulletList[0];
+//		for (int j = 0; j < sameBulletList.Count; j++) 
+//		{
+//			if (sameBulletList[j].gameObject.activeSelf) total++;
+//		}
+//		totalBulletsInPlay = total;
+
         if (mIsDisableSpawnBullet)
         {
             mDisableSpawnBulletTimer += Time.deltaTime;
@@ -106,7 +117,7 @@ public class BulletManager : MonoBehaviour
         List<Transform> sameBulletList = new List<Transform>();
         for (int i = 0; i < total; i++)
         {
-            Transform trans = Instantiate(currBullet, Vector3.zero, Quaternion.identity);
+            Transform trans = Instantiate(currBullet, Vector3.zero, currBullet.rotation);
             trans.name = currBullet.name;
             trans.SetParent(go.transform);
             trans.gameObject.SetActive(false);
@@ -116,7 +127,7 @@ public class BulletManager : MonoBehaviour
             // Set sort order for enemy bullets.
             SpriteRenderer transSr = trans.GetComponent<SpriteRenderer>();
             if (transSr != null && transSr.sortingLayerName == TagManager.sSingleton.sortLayerTopG) 
-                transSr.sortingOrder = i;
+                transSr.sortingOrder = mOrderInLayer++;
         }
 
         if (groupIndex == 0) mPlyMainBulletList.Add(sameBulletList);
@@ -190,6 +201,7 @@ public class BulletManager : MonoBehaviour
                 Transform currBullet = sameBulletList[j];
                 if (currBullet.gameObject.activeSelf)
                 {
+					currBullet.gameObject.SetActive (false);
                     Vector3 pos = currBullet.position;
                     EnvObjManager.sSingleton.TransformBulletIntoScorePU(pos);
                 }
@@ -199,18 +211,23 @@ public class BulletManager : MonoBehaviour
 
 	public void TransformEnemyBulIntoPlayerBul(int playerID, Transform other)
 	{
-        Transform trans = GetBulletTrans (GroupIndex.PLAYER_MAIN, playerID - 1);
-		trans.position = other.position;
+        Vector2 dir = EnemyManager.sSingleton.GetClosestEnemyDir(other);
 
-        BulletMove bulletMove = trans.GetComponent<BulletMove>();
-        int dmg = BombManager.sSingleton.bombShieldReturnDmg;
-        float spd = BombManager.sSingleton.bombShieldReturnSpd;
-        bulletMove.SetProperties(AttackPattern.Template.SINGLE_SHOT, dmg, spd);
-        bulletMove.SetPlayer(true);
+        if (dir != Vector2.zero)
+        {
+            Transform trans = GetBulletTrans (GroupIndex.PLAYER_MAIN, playerID - 1);
+    		trans.position = other.position;
 
-        Vector2 dir = EnemyManager.sSingleton.GetClosestEnemyDir(trans);
-        bulletMove.SetDirection(dir);
-        trans.gameObject.SetActive (true);
+            int dmg = BombManager.sSingleton.bombShieldReturnDmg;
+            float spd = BombManager.sSingleton.bombShieldReturnSpd;
+
+            BulletMove bulletMove = trans.GetComponent<BulletMove>();
+            bulletMove.SetProperties(AttackPattern.Template.SINGLE_SHOT, dmg, spd);
+            bulletMove.SetPlayer();
+
+            bulletMove.SetDirection(dir);
+            trans.gameObject.SetActive (true);
+        }
 	}
 
     IEnumerator IEAlphaOutSequence (SpriteRenderer sr)

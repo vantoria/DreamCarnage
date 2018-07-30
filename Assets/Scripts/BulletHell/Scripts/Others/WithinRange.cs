@@ -30,13 +30,33 @@ public class WithinRange : MonoBehaviour
             }
         }
 
-//        Vector2 dir = closestTrans.position - mPlayerTrans.position;
         return closestTrans;
+    }
+
+    public Transform GetFurthestEnemy()
+    {
+        if (hitList.Count == 0) return null;
+
+        Transform furthestTrans = hitList[0];
+        float maxSqrLength = (mPlayerTrans.position - hitList[0].position).sqrMagnitude;
+
+        for (int i = 1; i < hitList.Count; i++)
+        {
+            float magnitude = (mPlayerTrans.position - hitList[i].position).sqrMagnitude;
+            if (magnitude > maxSqrLength)
+            {
+                furthestTrans = hitList[i];
+                maxSqrLength = magnitude;
+            }
+        }
+
+        return furthestTrans;
     }
 
 	void OnTriggerEnter2D(Collider2D other)
 	{
-		if (other.tag == TagManager.sSingleton.enemyTag) 
+		if (other.tag == TagManager.sSingleton.enemyTag || other.tag == TagManager.sSingleton.ENV_OBJ_RockTag || 
+			other.tag == TagManager.sSingleton.ENV_OBJ_CrateTag) 
         {
 			hitList.Add (other.transform);
 		}

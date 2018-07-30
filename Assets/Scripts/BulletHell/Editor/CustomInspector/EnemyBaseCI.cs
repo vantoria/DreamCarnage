@@ -21,21 +21,23 @@ public class EnemyBaseCI : Editor
 
         if (mSelf.isBoss)
         {
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("healthBarTrans"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("pingPongSpeed"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("pingPongVal"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("isEndShakeScreen"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("delayBeforeAttack"));
         }
-        else
-        {
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("type"));
-        }
+//        else
+//        {
+//            EditorGUILayout.PropertyField(serializedObject.FindProperty("type"));
+//        }
 
         EditorGUILayout.PropertyField(serializedObject.FindProperty("currHitPoint"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("totalHitPoint"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("scoreMultiplier"));
+		EditorGUILayout.PropertyField(serializedObject.FindProperty("scoreMultiplier"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("defeatedScore"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("defeatedMult"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("anim"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("currActionNum"));
+		EditorGUILayout.PropertyField(serializedObject.FindProperty("currActionNum"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("attackTransList"), true);
 
         serializedObject.ApplyModifiedProperties();

@@ -7,17 +7,19 @@ public class EnemyManager : MonoBehaviour
     public static EnemyManager sSingleton { get { return _sSingleton; } }
     static EnemyManager _sSingleton;
 
-    public bool isAppearEnemy = true;
+	public bool isAppearEnemy = true;
+    public bool isAppearBoss = true;
+    public EnemyHealth bossEnemyHealthBar;
 
     [System.Serializable]
     public class EnemyInfo
     {
         public GroupIndex groupIndex;
 
-        public AttackPattern.Target attackTarget;
+        public Transform attackPatternTrans;
+		public EnemyMovement movePattern;
         public Transform spawnPosition;
         public float spawnTime;
-        public EnemyMovement.Movement movement;
     }
 
     public enum GroupIndex
@@ -27,30 +29,24 @@ public class EnemyManager : MonoBehaviour
         MINION_3
     }
 
+	public List<float> meetBossTimeList = new List<float>();
+
     [HideInInspector] public List<Transform> enemyList = new List<Transform>();
 
     // Instantiated enemy minions.
-//    List<Transform> mEnemyMinion1List = new List<Transform>();
-//    List<Transform> mEnemyMinion2List = new List<Transform>();
-//    List<Transform> mEnemyMinion3List = new List<Transform>();
+    List<Transform> mEnemyMinion1List = new List<Transform>();
+    List<Transform> mEnemyMinion2List = new List<Transform>();
+    List<Transform> mEnemyMinion3List = new List<Transform>();
     List<Transform> mEnemyBossList = new List<Transform>();
 
-    // The component attached to enemy minions in scene.
-    List<AttackPattern> mEnemyMinion1APList = new List<AttackPattern>();
-    List<AttackPattern> mEnemyMinion2APList = new List<AttackPattern>();
-    List<AttackPattern> mEnemyMinion3APList = new List<AttackPattern>();
-
-    List<EnemyMovement> mEnemyMinion1MoveList = new List<EnemyMovement>();
-    List<EnemyMovement> mEnemyMinion2MoveList = new List<EnemyMovement>();
-    List<EnemyMovement> mEnemyMinion3MoveList = new List<EnemyMovement>();
-
     // Separate the minions moveInfo from scriptable PlayerNEnemyPrefabData.
-    List<EnemyInfo> mEnemyMinion1MoveInfoList = new List<EnemyInfo>();
-    List<EnemyInfo> mEnemyMinion2MoveInfoList = new List<EnemyInfo>();
-    List<EnemyInfo> mEnemyMinion3MoveInfoList = new List<EnemyInfo>();
-    List<EnemyInfo> mAllEnemyMinionMoveInfoList = new List<EnemyInfo>();
+	List<EnemyInfo> mEnemyMinion1InfoList = new List<EnemyInfo>();
+	List<EnemyInfo> mEnemyMinion2InfoList = new List<EnemyInfo>();
+	List<EnemyInfo> mEnemyMinion3InfoList = new List<EnemyInfo>();
+    List<EnemyInfo> mAllEnemyMinionInfoList = new List<EnemyInfo>();
 
     float mTimer;
+    [HideInInspector] public bool isBossAppeared = false, isBossDead = false;
 
     // The index for instantiated prefab to appear. (Used for mEnemyMinionMoveList)
     int mMinion1Index, mMinion2Index, mMinion3Index, mBossIndex;
@@ -59,14 +55,19 @@ public class EnemyManager : MonoBehaviour
     int mAppearIndex = 0;
 
     // The index for next in line to get moveData placed into instantiated prefab. (Used for mEnemyMinionMoveList)
-    int mMinion1MoveIndex, mMinion2MoveIndex, mMinion3MoveIndex;
+    int mMinion1SetIndex, mMinion2SetIndex, mMinion3SetIndex;
 
     // The saved index for Enemy moveData of each minion type. 
     // Ex: There might be 5 moveData for Minion_1 but with only 1 instantiated prefab for Minion_1. 
     // This var save the next index of moveData to be used by Minion_1. (Used for scriptableObj mEnemyMinionMoveInfoList)
-    int mMinion1SavedMoveIndex, mMinion2SavedMoveIndex, mMinion3SavedMoveIndex;
+    int mMinion1SavedSetIndex, mMinion2SavedSetIndex, mMinion3SavedSetIndex;
 
-    PlayerNEnemyPrefabData mPlayerAndEnemyPrefabData;
+    int mBonusScore = 2000000;
+    float mDelay = 0;
+    bool mIsShowScoreBonus = true;
+
+    // Used for adding bonus score after defeating stage boss.
+    PlayerController mPlayerController1, mPlayerController2;
 
     void Awake()
     {
@@ -74,86 +75,88 @@ public class EnemyManager : MonoBehaviour
         else _sSingleton = this;
     }
 
-    void Update()
+    void Start()
     {
-        if (!isAppearEnemy) return;
+        mPlayerController1 = GameManager.sSingleton.player1.GetComponent<PlayerController>();
 
-        mTimer += Time.deltaTime;
-        for (int i = mAppearIndex; i < mAllEnemyMinionMoveInfoList.Count; i++)
-        {
-//            Debug.Log("i " + i + " spawn time " + mAllEnemyMinionMoveInfoList[i].spawnTime);
-
-            if (mTimer >= mAllEnemyMinionMoveInfoList[i].spawnTime)
-            {
-                mAppearIndex = i + 1;
-                if (mAllEnemyMinionMoveInfoList[i].groupIndex == GroupIndex.MINION_1)
-                {
-                    Transform currEnemy = mEnemyMinion1MoveList[mMinion1Index].transform;
-                    currEnemy.position = mEnemyMinion1MoveList[mMinion1Index].spawnPosTrans.position;
-                    mEnemyMinion1APList[mMinion1Index].target = mAllEnemyMinionMoveInfoList[i].attackTarget;
-                    currEnemy.gameObject.SetActive(true);
-
-                    if (mMinion1Index + 1 > mEnemyMinion1MoveList.Count - 1) mMinion1Index = 0;
-                    else mMinion1Index++;
-                }
-//                else if (mAllEnemyMinionMoveInfoList[i].groupIndex == GroupIndex.MINION_2)
-//                {
-//                    mEnemyMinion2MoveList[mMinion2Index].gameObject.SetActive(true);
-//
-//                    if (mMinion2Index + 1 > mEnemyMinion2MoveList.Count - 1) mMinion2Index = 0;
-//                    else mMinion2Index++;
-//                }
-//                else if (mAllEnemyMinionMoveInfoList[i].groupIndex == GroupIndex.MINION_3)
-//                {
-//                    mEnemyMinion3MoveList[mMinion3Index].gameObject.SetActive(true);
-//
-//                    if (mMinion3Index + 1 > mEnemyMinion3MoveList.Count - 1) mMinion3Index = 0;
-//                    else mMinion3Index++;
-//                }
-            }
-
-        }
-//        if (Input.GetKeyDown(KeyCode.Return))
-//        {
-//            SetNextMinionMovement(GroupIndex.MINION_1);
-//        }
+        if (GameManager.sSingleton.IsThisPlayerActive(2))
+            mPlayerController2 = GameManager.sSingleton.player2.GetComponent<PlayerController>();
     }
 
-    public void AddMovementToMinion(PlayerNEnemyPrefabData data)
+    void Update()
+    {
+        if (GameManager.sSingleton.currState != GameManager.State.BATTLE) return;
+
+        if (!UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause) 
+		{
+			mTimer += Time.deltaTime;
+			if (isAppearBoss && !isBossAppeared)
+			{
+                if (mTimer > meetBossTimeList[GameManager.sSingleton.currStage - 1] && BombManager.sSingleton.dualLinkState != BombManager.DualLinkState.SHOOTING)
+				{
+					isBossAppeared = true;
+					GameManager.sSingleton.currState = GameManager.State.BOSS_MOVE_INTO_SCREEN;
+
+                    // Disable remaining enemies on screen.
+                    int count = enemyList.Count;
+                    for (int i = 0; i < count; i++)
+                    {
+                        enemyList[0].GetComponent<EnemyBase>().PlayEnemyDeathPS();
+                        enemyList[0].gameObject.SetActive(false);
+                    }
+
+                    EnvObjManager.sSingleton.DisableAllDestroyableObj();
+				}
+			}
+
+			if (isAppearEnemy) AppearEnemyMinion ();
+		}
+
+        if (isBossDead && !CoroutineUtil.isCoroutine)
+        {
+            System.Action action = (() => ShowAndAddBonusScore());
+            if (mIsShowScoreBonus) StartCoroutine(CoroutineUtil.WaitFor(2.0f, action));
+        }
+    }
+
+	public void AddAttackAndMovementToMinion(PlayerNEnemyPrefabData data)
     {
         // Put all enemy move list into a List, regardless of group type.
-        mPlayerAndEnemyPrefabData = data;
         for (int i = 0; i < data.s1EnemyMinionMoveList.Count; i++)
         {
             EnemyInfo currInfo = data.s1EnemyMinionMoveList[i];
-            mAllEnemyMinionMoveInfoList.Add(currInfo);
+			mAllEnemyMinionInfoList.Add(currInfo);
         }
 
         // Put earliest-latest spawn time minion into new List.
         List<EnemyInfo> spawnFirstList = new List<EnemyInfo>();
-        while (mAllEnemyMinionMoveInfoList.Count != 0)
+		while (mAllEnemyMinionInfoList.Count != 0)
         {
-            EnemyInfo minSpawnTimeInfo = mAllEnemyMinionMoveInfoList[0];
-            float minSpwTime = minSpawnTimeInfo.spawnTime;
+			EnemyInfo minSpawnTimeInfo = mAllEnemyMinionInfoList[0];
+
+            // TODO: Hard-coded start stage delay. To be changed.
+            if (data.startStageDelay.Count != 0) mDelay = data.startStageDelay[0];
+
+            float minSpwTime = minSpawnTimeInfo.spawnTime + mDelay;
             int index = 0;
 
-            for (int i = 1; i < mAllEnemyMinionMoveInfoList.Count; i++)
+			for (int i = 1; i < mAllEnemyMinionInfoList.Count; i++)
             {
-                EnemyInfo currInfo = mAllEnemyMinionMoveInfoList[i];
-                if (currInfo.spawnTime < minSpwTime)
+				EnemyInfo currInfo = mAllEnemyMinionInfoList[i];
+                if (currInfo.spawnTime + mDelay < minSpwTime)
                 {
                     index = i;
-                    minSpwTime = currInfo.spawnTime;
+                    minSpwTime = currInfo.spawnTime + mDelay;
                     minSpawnTimeInfo = currInfo;
                 }
             }
 
-            mAllEnemyMinionMoveInfoList.RemoveAt(index);
+			mAllEnemyMinionInfoList.RemoveAt(index);
             spawnFirstList.Add(minSpawnTimeInfo);
         }
 
         // Put spawnFirstList back into allEnemyMinionList.
-        mAllEnemyMinionMoveInfoList = spawnFirstList;
+		mAllEnemyMinionInfoList = spawnFirstList;
 
         // Testing purposes.
 //        for (int i = 0; i < mAllEnemyMinionMoveInfoList.Count; i++)
@@ -166,30 +169,30 @@ public class EnemyManager : MonoBehaviour
         {
             EnemyInfo currInfo = spawnFirstList[i];
 
-            if (currInfo.groupIndex == GroupIndex.MINION_1) mEnemyMinion1MoveInfoList.Add(currInfo);
-            else if (currInfo.groupIndex == GroupIndex.MINION_2) mEnemyMinion2MoveInfoList.Add(currInfo);
-            else if (currInfo.groupIndex == GroupIndex.MINION_3) mEnemyMinion3MoveInfoList.Add(currInfo);
+            if (currInfo.groupIndex == GroupIndex.MINION_1) mEnemyMinion1InfoList.Add(currInfo);
+			else if (currInfo.groupIndex == GroupIndex.MINION_2) mEnemyMinion2InfoList.Add(currInfo);
+			else if (currInfo.groupIndex == GroupIndex.MINION_3) mEnemyMinion3InfoList.Add(currInfo);
         }
 
-        // Set movement info to respective EnemyMovement script.
-        AddMovementToSameInstantiatedPrefabs(mEnemyMinion1MoveInfoList, mEnemyMinion1MoveList, ref mMinion1MoveIndex, ref mMinion1SavedMoveIndex);
-        AddMovementToSameInstantiatedPrefabs(mEnemyMinion2MoveInfoList, mEnemyMinion2MoveList, ref mMinion2MoveIndex, ref mMinion2SavedMoveIndex);
-        AddMovementToSameInstantiatedPrefabs(mEnemyMinion3MoveInfoList, mEnemyMinion3MoveList, ref mMinion3MoveIndex, ref mMinion3SavedMoveIndex);
+        // Set attack and movement info into respective enemy.
+        AddAttackAndMovementToSameInstantiatedPrefabs(mEnemyMinion1InfoList, mEnemyMinion1List, ref mMinion1SetIndex, ref mMinion1SavedSetIndex);
+        AddAttackAndMovementToSameInstantiatedPrefabs(mEnemyMinion2InfoList, mEnemyMinion2List, ref mMinion2SetIndex, ref mMinion2SavedSetIndex);
+        AddAttackAndMovementToSameInstantiatedPrefabs(mEnemyMinion3InfoList, mEnemyMinion3List, ref mMinion3SetIndex, ref mMinion3SavedSetIndex);
     }
 
     public void SetNextMinionMovement(GroupIndex groupIndex)
     {
         if (groupIndex == GroupIndex.MINION_1) 
-            AddMovementToNextPrefab(mEnemyMinion1MoveInfoList, mEnemyMinion1MoveList, ref mMinion1MoveIndex, ref mMinion1SavedMoveIndex);
+            AddAttackAndMovementToNextPrefab(mEnemyMinion1InfoList, mEnemyMinion1List, ref mMinion1SetIndex, ref mMinion1SavedSetIndex);
         else if (groupIndex == GroupIndex.MINION_2) 
-            AddMovementToNextPrefab(mEnemyMinion2MoveInfoList, mEnemyMinion2MoveList, ref mMinion2MoveIndex, ref mMinion2SavedMoveIndex);
+            AddAttackAndMovementToNextPrefab(mEnemyMinion2InfoList, mEnemyMinion2List, ref mMinion2SetIndex, ref mMinion2SavedSetIndex);
         else if (groupIndex == GroupIndex.MINION_3) 
-            AddMovementToNextPrefab(mEnemyMinion3MoveInfoList, mEnemyMinion3MoveList, ref mMinion3MoveIndex, ref mMinion3SavedMoveIndex);
+            AddAttackAndMovementToNextPrefab(mEnemyMinion3InfoList, mEnemyMinion3List, ref mMinion3SetIndex, ref mMinion3SavedSetIndex);
     }
 
     public void InstantiateAndCacheEnemyBoss(Transform currEnemy)
     {
-        Transform trans = Instantiate(currEnemy, Vector3.zero, Quaternion.identity);
+        Transform trans = Instantiate(currEnemy, currEnemy.position, Quaternion.identity);
         trans.name = currEnemy.name;
         trans.gameObject.SetActive(false);
         mEnemyBossList.Add(trans);
@@ -211,43 +214,24 @@ public class EnemyManager : MonoBehaviour
 
             sameEnemyList.Add(trans);
 
-            AttackPattern ap = trans.GetComponentInChildren<AttackPattern>();
-            EnemyMovement enemyMovement = trans.GetComponent<EnemyMovement>();
-
-            if (groupIndex == 0)
-            {
-                mEnemyMinion1APList.Add(ap);
-                mEnemyMinion1MoveList.Add(enemyMovement);
-            }
-            else if (groupIndex == 1)
-            {
-                mEnemyMinion2APList.Add(ap);
-                mEnemyMinion2MoveList.Add(enemyMovement);
-            }
-            else if (groupIndex == 2)
-            {
-                mEnemyMinion3APList.Add(ap);
-                mEnemyMinion3MoveList.Add(enemyMovement);
-            }
+			if (groupIndex == 0) mEnemyMinion1List.Add (trans);
+			else if (groupIndex == 1) mEnemyMinion2List.Add (trans);
+			else if (groupIndex == 2) mEnemyMinion3List.Add (trans);
 
             // Set sort order for enemy bullets.
 //            SpriteRenderer transSr = trans.GetComponent<SpriteRenderer>();
 //            if (transSr != null && transSr.sortingLayerName == TagManager.sSingleton.sortLayerTopG) 
 //                transSr.sortingOrder = i;
         }
-
-//        if (groupIndex == 0) mEnemyMinion1List = sameEnemyList;
-//        else if (groupIndex == 1) mEnemyMinion2List = sameEnemyList;
-//        else if (groupIndex == 2) mEnemyMinion3List = sameEnemyList;
     }
 
-//    public Transform GetEnemyBossTrans()
-//    {
-//        Transform trans = mEnemyBossList[mBossIndex];
-//        if (mBossIndex + 1 > mEnemyBossList.Count - 1) mBossIndex = 0;
-//        else mBossIndex++;
-//        return trans;
-//    }
+    public Transform GetEnemyBossTrans()
+    {
+        Transform trans = mEnemyBossList[mBossIndex];
+        if (mBossIndex + 1 > mEnemyBossList.Count - 1) mBossIndex = 0;
+        else mBossIndex++;
+        return trans;
+    }
 //
 //    public Transform GetEnemyMinionTrans(GroupIndex groupIndex)
 //    {
@@ -275,13 +259,13 @@ public class EnemyManager : MonoBehaviour
 //        return null;
 //    }
 
-    public void AddToList(Transform trans)
-    {
-        enemyList.Add(trans);
-    }
+    public void AddToList(Transform trans) { enemyList.Add(trans); }
+    public void RemoveFromList(Transform trans) { enemyList.Remove(trans); }
 
     public Vector2 GetClosestEnemyDir(Transform bullet)
     {
+        if (enemyList.Count == 0) return Vector2.zero;
+        
         Transform enemyTrans = enemyList[0];
         float minSqrLength = (enemyTrans.position - bullet.position).sqrMagnitude;
 
@@ -300,33 +284,119 @@ public class EnemyManager : MonoBehaviour
         return dir.normalized;
     }
 
-    // Send enemyMoveInfo(from scriptable object) to EnemyMovement(component).
-    void AddMovementToSameInstantiatedPrefabs(List<EnemyInfo> enemyMoveInfoList, List<EnemyMovement> enemyMovementList, ref int moveIndex, ref int savedIndex)
+    void ShowAndAddBonusScore()
+    {
+        mIsShowScoreBonus = false;
+        UIManager.sSingleton.ShowBonusScore(mBonusScore);
+
+        if (GameManager.sSingleton.TotalNumOfPlayer() == 2)
+        {
+            int dividedScore = mBonusScore / 2;
+            mPlayerController1.score += dividedScore;
+            mPlayerController2.score += dividedScore;
+        }
+        else if (GameManager.sSingleton.IsThisPlayerActive(1)) mPlayerController1.score += mBonusScore;
+        else if (GameManager.sSingleton.IsThisPlayerActive(2)) mPlayerController2.score += mBonusScore;
+
+        if (GameManager.sSingleton.IsThisPlayerActive(1)) UIManager.sSingleton.UpdateScore(1, mPlayerController1.score);
+        if (GameManager.sSingleton.IsThisPlayerActive(2)) UIManager.sSingleton.UpdateScore(2, mPlayerController2.score);
+
+        StartCoroutine(CoroutineUtil.WaitFor(5.0f, AfterBossIsDead));
+    }
+
+    void AfterBossIsDead()
+    {
+        isBossDead = false;
+        UIManager.sSingleton.EnableGameOverScreen();
+    }
+
+	void AppearEnemyMinion()
+	{
+		for (int i = mAppearIndex; i < mAllEnemyMinionInfoList.Count; i++)
+		{
+            if (mTimer >= mAllEnemyMinionInfoList[i].spawnTime + mDelay)
+			{
+				mAppearIndex = i + 1;
+				if (mAllEnemyMinionInfoList[i].groupIndex == GroupIndex.MINION_1)
+				{
+					Transform currEnemy = mEnemyMinion1List[mMinion1Index].transform;
+					currEnemy.position = mAllEnemyMinionInfoList[i].spawnPosition.position;
+					currEnemy.gameObject.SetActive(true);
+
+					if (mMinion1Index + 1 > mEnemyMinion1List.Count - 1) mMinion1Index = 0;
+					else mMinion1Index++;
+				}
+                else if (mAllEnemyMinionInfoList[i].groupIndex == GroupIndex.MINION_2)
+                {
+                    Transform currEnemy = mEnemyMinion2List[mMinion2Index].transform;
+                    currEnemy.position = mAllEnemyMinionInfoList[i].spawnPosition.position;
+                    currEnemy.gameObject.SetActive(true);
+
+                    if (mMinion2Index + 1 > mEnemyMinion2List.Count - 1) mMinion2Index = 0;
+                    else mMinion2Index++;
+                }
+                else if (mAllEnemyMinionInfoList[i].groupIndex == GroupIndex.MINION_3)
+                {
+                    Transform currEnemy = mEnemyMinion3List[mMinion3Index].transform;
+                    currEnemy.position = mAllEnemyMinionInfoList[i].spawnPosition.position;
+                    currEnemy.gameObject.SetActive(true);
+
+                    if (mMinion3Index + 1 > mEnemyMinion3List.Count - 1) mMinion3Index = 0;
+                    else mMinion3Index++;
+                }
+			}
+		}
+	}
+
+    // Set enemy attack and move pattern to everything in minionTransList.
+    void AddAttackAndMovementToSameInstantiatedPrefabs(List<EnemyInfo> enemyInfoList, List<Transform> minionTransList, ref int currMinionIndex, ref int savedIndex)
     {
         bool isLoop = true;
         while(isLoop)
         {
-            isLoop = AddMovementToNextPrefab(enemyMoveInfoList, enemyMovementList, ref moveIndex, ref savedIndex);
+            isLoop = AddAttackAndMovementToNextPrefab(enemyInfoList, minionTransList, ref currMinionIndex, ref savedIndex);
         }
     }
 
-    // Send enemyMoveInfo(from scriptable object) to EnemyMovement(component).
-    bool AddMovementToNextPrefab(List<EnemyInfo> enemyMoveInfoList, List<EnemyMovement> enemyMovementList, ref int moveIndex, ref int savedIndex)
+    // Set enemy attack and move pattern.
+	bool AddAttackAndMovementToNextPrefab(List<EnemyInfo> enemyInfoList, List<Transform> minionTransList, ref int currMinionIndex, ref int savedIndex)
     {
-        if (savedIndex + moveIndex > enemyMoveInfoList.Count - 1) return false;
+        if (savedIndex + currMinionIndex > enemyInfoList.Count - 1) return false;
             
-        EnemyInfo currInfo = enemyMoveInfoList[savedIndex + moveIndex];
-        enemyMovementList[moveIndex].SetMovement(currInfo.spawnPosition, currInfo.movement);
-//        Debug.Log(currInfo.spawnPosition.name);
+        EnemyInfo currInfo = enemyInfoList[savedIndex + currMinionIndex];
 
-        // If the next index is over the instantiated prefab count, reset it back to 0(use back the first prefab).
-        if (moveIndex + 1 > enemyMovementList.Count - 1)
+        // Get all attack pattern component from current enemy, then destroy all leaving only 1.
+        AttackPattern[] currApArray = minionTransList[currMinionIndex].GetComponentsInChildren<AttackPattern>();
+        for (int i = 1; i < currApArray.Length; i++)
         {
-            savedIndex += moveIndex + 1;
-            moveIndex = 0;
+            Destroy(currApArray[i]);
+        }
+
+		// Set attack pattern.
+        AttackPattern currAp = minionTransList[currMinionIndex].GetComponentInChildren<AttackPattern>();
+        AttackPattern[] infoApArray = currInfo.attackPatternTrans.GetComponents<AttackPattern>();
+        for (int i = 0; i < infoApArray.Length; i++)
+        {
+            if (i == 0)
+                currAp.SetAttackPattern(infoApArray[0]);
+            else
+                minionTransList[currMinionIndex].transform.GetChild(1).gameObject.AddComponent<AttackPattern>().SetAttackPattern(infoApArray[i]);
+        }
+
+//        minionTransList[currMinionIndex].GetComponentInChildren<AttackPattern>().SetAttackPattern(currInfo.attackPattern);
+//        minionTransList[currMinionIndex].GetComponent<Enemy1>().UpdateAttackPattern();
+
+		// Set move pattern.
+        minionTransList[currMinionIndex].GetComponent<EnemyMovement>().SetMovement(currInfo.spawnPosition, currInfo.movePattern.movementList[0]);
+
+        // If the currMinionIndex is over the instantiated prefab count, reset it back to 0(use back the first prefab).
+        if (currMinionIndex + 1 > minionTransList.Count - 1)
+        {
+            savedIndex += currMinionIndex + 1;
+            currMinionIndex = 0;
             return false;
         }
-        else moveIndex++;
+        else currMinionIndex++;
 
         return true;
     }

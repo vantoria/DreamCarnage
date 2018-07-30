@@ -13,25 +13,31 @@ public class CharacterData : ScriptableObject
 			UNITY_CHAN,
 			CHIBI_CHAN,
             KOSAME_HISAKAKI,
-            TEST
+            TEST,
+            HARUKA,
+            BOSS,
+            TOORU
 		};
 
         public Character name;
         public Color color;
         public List<Sprite> spriteList;
+        public List<Transform> charPosList = new List<Transform>();
 
         public Info()
         {
             this.name = Character.UNITY_CHAN;
             this.color = Color.white;
             this.spriteList = new List<Sprite>(1);
+            this.charPosList = new List<Transform>();
         }
 
-        public Info(Character name, List<Sprite> spriteList, Color color)
+        public Info(Character name, List<Sprite> spriteList, Color color, List<Transform> charPosList)
         {
             this.name = name;
             this.color = color;
             this.spriteList = spriteList;
+            this.charPosList = charPosList;
         }
     }
 

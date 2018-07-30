@@ -9,24 +9,27 @@ public class JoystickManager : MonoBehaviour
 
 	public class JoystickInput
 	{
-		public KeyCode acceptKey, backKey, fireKey, bombKey, reviveKey, slowMoveKey, pauseKey;
+        public KeyCode acceptKey, backKey, returnDefault, fireKey, bombKey, reviveKey, slowMoveKey, startKey, skipConvoKey, languageChange;
 
-		public JoystickInput(KeyCode acceptKey, KeyCode backKey, KeyCode fireKey, KeyCode bombKey, 
-			KeyCode reviveKey, KeyCode slowMoveKey, KeyCode pauseKey)
+        public JoystickInput(KeyCode acceptKey, KeyCode backKey, KeyCode returnDefault, KeyCode fireKey, KeyCode bombKey, 
+            KeyCode reviveKey, KeyCode slowMoveKey, KeyCode startKey, KeyCode skipConvoKey, KeyCode languageChange)
 		{
 			this.acceptKey = acceptKey;
-			this.backKey = backKey; 
+            this.backKey = backKey; 
+            this.returnDefault = returnDefault; 
 			this.fireKey = fireKey;
 			this.bombKey = bombKey;
 			this.reviveKey = reviveKey;
 			this.slowMoveKey = slowMoveKey;
-			this.pauseKey = pauseKey;
+            this.startKey = startKey;
+            this.skipConvoKey = skipConvoKey;
+            this.languageChange = languageChange;
 		}
 	}
 	public JoystickInput p1_joystick;
 	public JoystickInput p2_joystick;
 
-	enum GamePadButtons
+	public enum GamePadButtons
 	{
 		SQUARE = 0,
 		CROSS,
@@ -42,21 +45,32 @@ public class JoystickManager : MonoBehaviour
 		R3,
 		PADPRESS
 	}
-	[SerializeField] GamePadButtons accept = GamePadButtons.CIRCLE;
-	[SerializeField] GamePadButtons back = GamePadButtons.CROSS;
-	[SerializeField] GamePadButtons start = GamePadButtons.OPTIONS;
 
-	[SerializeField] GamePadButtons fire = GamePadButtons.SQUARE;
-	[SerializeField] GamePadButtons bomb = GamePadButtons.CROSS;
-	[SerializeField] GamePadButtons revive = GamePadButtons.CIRCLE;
-	[SerializeField] GamePadButtons slowMove = GamePadButtons.L2;
-	[SerializeField] GamePadButtons pause = GamePadButtons.OPTIONS;
+	[System.Serializable]
+	public class GamePad
+	{
+		public GamePadButtons accept = GamePadButtons.CIRCLE;
+        public GamePadButtons back = GamePadButtons.CROSS;
+        public GamePadButtons returnDefault = GamePadButtons.TRIANGLE;
+		public GamePadButtons start = GamePadButtons.OPTIONS;
+
+		public GamePadButtons fire = GamePadButtons.SQUARE;
+		public GamePadButtons bomb = GamePadButtons.CROSS;
+		public GamePadButtons revive = GamePadButtons.R2;
+		public GamePadButtons slowMove = GamePadButtons.L2;
+		public GamePadButtons pause = GamePadButtons.OPTIONS;
+        public GamePadButtons skipConvo = GamePadButtons.TRIANGLE;
+        public GamePadButtons languageChange = GamePadButtons.SQUARE;
+	}
+	public GamePad controlA, controlB;
 
 	[ReadOnlyAttribute]public int connectedGamepadCount = 0;
 
+    bool mIsP1KeybInput = true;
+
 	void Awake()
 	{
-		if (_sSingleton != null && _sSingleton != this) Destroy(this.gameObject);
+        if (_sSingleton != null && _sSingleton != this) Destroy(this);
 		else _sSingleton = this;
 	}
 
@@ -65,29 +79,62 @@ public class JoystickManager : MonoBehaviour
 		int max = Input.GetJoystickNames().Length;
 		for (int i = 0; i < max; i++)
 		{
+//            Debug.Log(Input.GetJoystickNames()[1]);
 			// Check out with Input Manager....
 			if (Input.GetJoystickNames()[i].Length == 19) connectedGamepadCount++;
 		}
 
+        if (JoystickManager.sSingleton.connectedGamepadCount > 0) mIsP1KeybInput = false;
+
 		// Set up joystick 1 input.
-		KeyCode acceptKey = GetJoystickButton (1, accept);
-		KeyCode backKey = GetJoystickButton (1, back);
-		KeyCode fireKey = GetJoystickButton (1, fire);
-		KeyCode bombKey = GetJoystickButton (1, bomb);
-		KeyCode reviveKey = GetJoystickButton (1, revive);
-		KeyCode slowMoveKey = GetJoystickButton (1, slowMove);
-		KeyCode pauseKey = GetJoystickButton (1, pause);
-		p1_joystick = new JoystickInput(acceptKey, backKey, fireKey, bombKey, reviveKey, slowMoveKey, pauseKey);
+		KeyCode acceptKey = GetJoystickButton (1, controlA.accept);
+        KeyCode backKey = GetJoystickButton (1, controlA.back);
+        KeyCode returnDefault = GetJoystickButton (1, controlA.returnDefault);
+		KeyCode fireKey = GetJoystickButton (1, controlA.fire);
+		KeyCode bombKey = GetJoystickButton (1, controlA.bomb);
+		KeyCode reviveKey = GetJoystickButton (1, controlA.revive);
+		KeyCode slowMoveKey = GetJoystickButton (1, controlA.slowMove);
+		KeyCode pauseKey = GetJoystickButton (1, controlA.start);
+        KeyCode skipConvoKey = GetJoystickButton (1, controlA.skipConvo);
+        KeyCode languageKey = GetJoystickButton (1, controlA.languageChange);
+        p1_joystick = new JoystickInput(acceptKey, backKey, returnDefault, fireKey, bombKey, reviveKey, slowMoveKey, pauseKey, skipConvoKey, languageKey);
 
 		// Set up joystick 2 input.
-		acceptKey = GetJoystickButton (2, accept);
-		backKey = GetJoystickButton (2, back);
-		fireKey = GetJoystickButton (2, fire);
-		bombKey = GetJoystickButton (2, bomb);
-		reviveKey = GetJoystickButton (2, revive);
-		slowMoveKey = GetJoystickButton (2, slowMove);
-		pauseKey = GetJoystickButton (2, pause);
-		p2_joystick = new JoystickInput(acceptKey, backKey, fireKey, bombKey, reviveKey, slowMoveKey, pauseKey);
+		acceptKey = GetJoystickButton (2, controlA.accept);
+		backKey = GetJoystickButton (2, controlA.back);
+        returnDefault = GetJoystickButton (2, controlA.returnDefault);
+		fireKey = GetJoystickButton (2, controlA.fire);
+		bombKey = GetJoystickButton (2, controlA.bomb);
+		reviveKey = GetJoystickButton (2, controlA.revive);
+		slowMoveKey = GetJoystickButton (2, controlA.slowMove);
+		pauseKey = GetJoystickButton (2, controlA.start);
+        skipConvoKey = GetJoystickButton (2, controlA.skipConvo);
+        languageKey = GetJoystickButton (2, controlA.languageChange);
+        p2_joystick = new JoystickInput(acceptKey, backKey, returnDefault, fireKey, bombKey, reviveKey, slowMoveKey, pauseKey, skipConvoKey, languageKey);
+	}
+
+    public bool IsP1KeybInput { get { return mIsP1KeybInput; } }
+
+    public void SaveControlLayout(int joystickNum, int controlType)
+	{
+        GamePad gamepad = null;
+        if (controlType == 0) gamepad = controlA;
+        else if (controlType == 1) gamepad = controlB;
+
+        KeyCode acceptKey = GetJoystickButton (joystickNum, gamepad.accept);
+        KeyCode backKey = GetJoystickButton (joystickNum, gamepad.back);
+        KeyCode returnDefault = GetJoystickButton (joystickNum, gamepad.returnDefault);
+        KeyCode fireKey = GetJoystickButton (joystickNum, gamepad.fire);
+        KeyCode bombKey = GetJoystickButton (joystickNum, gamepad.bomb);
+        KeyCode reviveKey = GetJoystickButton (joystickNum, gamepad.revive);
+        KeyCode slowMoveKey = GetJoystickButton (joystickNum, gamepad.slowMove);
+        KeyCode pauseKey = GetJoystickButton (joystickNum, gamepad.start);
+        KeyCode skipConvoKey = GetJoystickButton (joystickNum, gamepad.skipConvo);
+        KeyCode languageKey = GetJoystickButton (joystickNum, gamepad.languageChange);
+
+        JoystickInput input = new JoystickInput(acceptKey, backKey, returnDefault, fireKey, bombKey, reviveKey, slowMoveKey, pauseKey, skipConvoKey, languageKey);
+        if (joystickNum == 1) p1_joystick = input;
+        else if (joystickNum == 2) p2_joystick = input;
 	}
 
 	KeyCode GetJoystickButton(int joystickNum, GamePadButtons button)

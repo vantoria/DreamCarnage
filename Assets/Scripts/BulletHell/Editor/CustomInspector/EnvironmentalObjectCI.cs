@@ -27,9 +27,12 @@ public class EnvironmentalObjectCI : Editor
 
         if (mSelf.isDestructable)
         {
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("hitPoint"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("currHitPoint"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("maxHitPoint"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("impactMultiplier"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("extraLinkMultiplier"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("scoreMultiplier"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("defeatedMult"));
         }
 
         serializedObject.ApplyModifiedProperties();

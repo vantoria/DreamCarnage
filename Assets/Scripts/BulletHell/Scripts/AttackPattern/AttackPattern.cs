@@ -6,11 +6,20 @@ using System;
 public class AttackPattern : MonoBehaviour 
 {
     // Base stats.
-    public bool isPlayer = false;
+    public enum OwnerType
+    {
+        PLAYER = 0,
+        ENEMY,
+    }
+    public OwnerType ownerType = OwnerType.ENEMY;
+
     public Transform owner;
     public float mainBulletDamage = 1, secondaryBulletDamage = 1, hpPercentSkipAtk = 100;
     public float mainBulletSpeed = 5, secondaryBulletSpeed = 5, shootDelay = 0.2f;
-    public bool isMainPiercing = false, isSecondaryPiercing = false;
+    public float pauseEverySec = 8, pauseDur = 1;
+    public bool isMainPiercing = false, isSecondaryPiercing = false, isAlternateFire = false, isMagnum = false;
+    public float alternateFireOffset = 1;
+	public float magnumMarkedDuration = 1.5f;
 
     // Base laser stats.
     public float damagePerFrame = 0.1f, expandSpeed = 7, expandTillXScale = 3.5f;
@@ -21,7 +30,7 @@ public class AttackPattern : MonoBehaviour
     public int mainBulletIndex, secondaryBulletIndex;
 
     // Player stats.
-    public Vector2 bulletDirection, mainBulletOffset;
+    public Vector2 bulletDirection, mainBulletOffset, secondaryBulletOffset;
 
     // Enemy stats.
     public enum Target
@@ -32,7 +41,7 @@ public class AttackPattern : MonoBehaviour
     }
     public Target target = Target.PLAYER_1;
     public float duration = 10, onceStartDelay;
-    public bool isShowDuration = false, isPotraitShow = false, isShootPlayer = true;
+    public bool isShowDuration = false, isPotraitShow = false, isShootPlayer = true, isFollowPlayer = true, isDirectionFromOwner = false;
     public Sprite charSprite, spellCardSprite;
     public Vector2 shootDirection;
     //    public bool isDisBulletAftDone = false;
@@ -86,11 +95,12 @@ public class AttackPattern : MonoBehaviour
     public class Properties
     {
         // Fixed value.
-        public bool isPlayer;
+        public OwnerType ownerType;
         public Template template;
         public float damage, speed, frequency, magnitude, magExpandMult;
         public float giveStatRepelDur, slowValue, repelValue;
 		public float trapDelayExpand, trapExpandDur, trapExpandSpd, trapRotateSpd, trapMoveSpd, trapDelayShrink, trapShrinkSpd, trapFadeSpd;
+        public bool isAlternateFire, isMagnum;
 
         // Values that will be changed real-time.
         public Vector2 direction;
@@ -98,8 +108,9 @@ public class AttackPattern : MonoBehaviour
 
         public Properties()
         {
-            isPlayer = false;
+            ownerType = OwnerType.ENEMY;
             template = Template.SINGLE_SHOT;
+            isAlternateFire = isMagnum = false;
             damage = speed = frequency = magnitude = magExpandMult = 0;
 			giveStatRepelDur = slowValue = repelValue = trapDelayExpand = trapExpandDur = trapExpandSpd = trapMoveSpd = trapDelayShrink = trapShrinkSpd = trapFadeSpd = 0;
             direction = curveAxis = Vector2.zero;
@@ -110,7 +121,15 @@ public class AttackPattern : MonoBehaviour
     public SecondaryAttackType secondaryAttackType;
     public WithinRange withinRange;
 
-    float mTimer, mAngle, mIncreaseTRTimer, mSlowDownTimer;
+	public enum AlternateFire
+	{
+		LEFT = 0,
+		RIGHT
+	}
+	AlternateFire alternateFire = AlternateFire.LEFT;
+
+    Vector2 mSavedDir = Vector2.zero;
+    float mPauseTimer, mTimer, mAngle, mIncreaseTRTimer, mSlowDownTimer;
     bool mIsCoroutine = false;
 
     List<IEnumerator> mAttackCoList = new List<IEnumerator>();
@@ -125,13 +144,16 @@ public class AttackPattern : MonoBehaviour
         GetNewestSameBulletList();
         UpdateProperties();
         mSavedTemplateList = template;
+
+        if (owner == null) owner = transform.parent;
+        GameManager.sSingleton.MagnumMarkedDuration = magnumMarkedDuration;
     }
 
     void GetNewestSameBulletList()
     {
         savedMainBulletIndex = mainBulletIndex;
 
-        if (isPlayer)
+        if (ownerType == OwnerType.PLAYER)
         {
             savedSecondaryBulletIndex = secondaryBulletIndex;
 
@@ -182,6 +204,51 @@ public class AttackPattern : MonoBehaviour
             UpdateProperties();
         }
     }
+
+	public void SetAttackPattern(AttackPattern ap)
+	{
+        ownerType = ap.ownerType;
+		mainBulletDamage = ap.mainBulletDamage; secondaryBulletDamage = ap.secondaryBulletDamage; hpPercentSkipAtk = ap.hpPercentSkipAtk;
+		mainBulletSpeed = ap.mainBulletSpeed; secondaryBulletSpeed = ap.secondaryBulletSpeed; shootDelay = ap.shootDelay;
+		isMainPiercing = ap.isMainPiercing; isSecondaryPiercing = ap.isSecondaryPiercing;
+        pauseEverySec = ap.pauseEverySec; pauseDur = ap.pauseDur;
+
+        mainBulletIndex = ap.mainBulletIndex; secondaryBulletIndex = ap.secondaryBulletIndex;
+
+		// Base laser stats.
+		damagePerFrame = ap.damagePerFrame; expandSpeed = ap.expandSpeed; expandTillXScale = ap.expandTillXScale;
+		isDestroyBullets = ap.isDestroyBullets;
+
+		// Enemy stats.
+		target = ap.target;
+		duration = ap.duration; onceStartDelay = ap.onceStartDelay;
+        isShowDuration = ap.isShowDuration; isPotraitShow = ap.isPotraitShow; isShootPlayer = ap.isShootPlayer; isFollowPlayer = ap.isFollowPlayer;
+
+		bulletType = ap.bulletType;
+		template = ap.template;
+
+		// Shoot at player values.
+		initialSpacing = ap.initialSpacing;
+        viewAngle = ap.viewAngle; segments = ap.segments;
+
+		// Shoot around in circle values.
+		isClockwise = ap.isClockwise;
+		distance = ap.distance; startTurnDelay = ap.startTurnDelay; turningRate = ap.turningRate; increaseTR = ap.increaseTR; increaseTRTime = ap.increaseTRTime; maxTR = ap.maxTR;
+		xOffset = ap.xOffset; yOffset = ap.yOffset;
+
+		speedChangeList = ap.speedChangeList;
+
+		// Sine wave values.
+		offsetPosition = ap.offsetPosition;
+		frequency = ap.frequency; magnitude = ap.magnitude; magExpandMult = ap.magExpandMult; sineWaveBullets = ap.sineWaveBullets; cooldown = ap.cooldown;
+
+		// Shock repel values.
+		giveStatRepelDur = ap.giveStatRepelDur; slowValue = ap.slowValue; repelValue = ap.repelValue;
+		trapDelayExpand = ap.trapDelayExpand; trapExpandDur = ap.trapExpandDur; trapExpandSpd = ap.trapExpandSpd;
+		trapRotateSpd = ap.trapRotateSpd; trapMoveSpd = ap.trapMoveSpd; trapDelayShrink = ap.trapDelayShrink; trapShrinkSpd = ap.trapShrinkSpd; trapFadeSpd = ap.trapFadeSpd;
+	}
+
+    public AlternateFire GetCurrAlternateFire { get { return alternateFire; } }
 
     public void StartAttack(Action doLast)
     {
@@ -241,19 +308,26 @@ public class AttackPattern : MonoBehaviour
             if (bulletType == BulletType.PROJECTILE || bulletType == BulletType.PROJECTILE_LOCK_ON)
             {
                 Transform currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.PLAYER_SECONDARY, secondaryBulletIndex);
-                currBullet.position = fairyPosList[i];
+                Vector3 pos = fairyPosList[i];
+                pos.x += secondaryBulletOffset.x;
+                pos.y += secondaryBulletOffset.y;
+                currBullet.position = pos;
                 currBullet.gameObject.SetActive(true);
 
                 BulletMove bulletMove = currBullet.GetComponent<BulletMove>();
                 bulletMove.SetBaseProperties(properties);
                 bulletMove.SetIsPiercing(isSecondaryPiercing);
                 bulletMove.SetProperties(Template.SINGLE_SHOT, secondaryBulletDamage, secondaryBulletSpeed);
+                bulletMove.BulletType = BulletManager.GroupIndex.PLAYER_SECONDARY;
 
                 if (bulletType == BulletType.PROJECTILE)
                     bulletMove.SetDirection(bulletDirection);
                 else if (bulletType == BulletType.PROJECTILE_LOCK_ON)
                 {
-                    Transform enemy = withinRange.GetClosestEnemy();
+                    Transform enemy = null;
+
+                    if (!mPlayerController.IsShiftPressed) enemy = withinRange.GetClosestEnemy();
+                    else if (mPlayerController.IsShiftPressed) enemy = withinRange.GetFurthestEnemy();
 
                     if (enemy == null) bulletMove.SetDirection(bulletDirection);
                     else
@@ -302,12 +376,19 @@ public class AttackPattern : MonoBehaviour
                 {
                     mTimer += Time.deltaTime;
                     onceStartDelay -= Time.deltaTime;
+                    if (onceStartDelay < 0) onceStartDelay = 0;
                 }
                 yield return null;
             }
 
             if (!BulletManager.sSingleton.IsDisableSpawnBullet)
             {
+                while (pauseEverySec != 0 && mPauseTimer >= pauseEverySec)
+                {
+                    mPauseTimer = 0;
+                    yield return new WaitForSeconds(pauseDur);
+                }
+
                 if (template == Template.SHOCK_REPEL_AND_TRAP_LASER && !isShot)
                 {
                     ShootSingleShot(targetTrans);
@@ -325,6 +406,8 @@ public class AttackPattern : MonoBehaviour
             }
 
             mTimer += shootDelay + Time.deltaTime;
+            mPauseTimer += shootDelay + Time.deltaTime;
+
             yield return new WaitForSeconds(shootDelay);
         }
         mIsCoroutine = false;
@@ -347,12 +430,21 @@ public class AttackPattern : MonoBehaviour
 
             if (!BulletManager.sSingleton.IsDisableSpawnBullet)
             {
+                while (pauseEverySec != 0 && mPauseTimer >= pauseEverySec)
+                {
+                    mPauseTimer = 0;
+                    mTimer += pauseDur;
+                    yield return new WaitForSeconds(pauseDur);
+                }
+
                 if(template == Template.SINGLE_SHOT) ShootSingleShot(targetTrans);
                 else if(template == Template.ANGLE_SHOT) ShootAngleShot(targetTrans);
                 else if(template == Template.SHOOT_AROUND_IN_CIRCLE) ShootAroundInCirlce();
             }
 
             mTimer += shootDelay + Time.deltaTime;
+            mPauseTimer += shootDelay + Time.deltaTime;
+
             yield return new WaitForSeconds(shootDelay);
         }
         doLast();
@@ -384,16 +476,27 @@ public class AttackPattern : MonoBehaviour
                 yield return null;
             }
 
+            while (pauseEverySec != 0 && mPauseTimer >= pauseEverySec)
+            {
+                mPauseTimer = 0;
+                yield return new WaitForSeconds(pauseDur);
+            }
+
             for (int i = 0; i < sineWaveBullets; i++)
             {
-                if (!BulletManager.sSingleton.IsDisableSpawnBullet) SineWaveShoot(targetTrans.position, isStartLeft);
+                if (!BulletManager.sSingleton.IsDisableSpawnBullet)
+                {
+                    SineWaveShoot(targetTrans.position, isStartLeft);
+                }
 
                 timer += shootDelay;
                 yield return new WaitForSeconds(shootDelay);
             }
             yield return new WaitForSeconds(cooldown);
 
+            mSavedDir = Vector2.zero;
             timer += cooldown + Time.deltaTime;
+            mPauseTimer += timer;
             mTimer = timer;
         }
         doLast();
@@ -402,8 +505,10 @@ public class AttackPattern : MonoBehaviour
 
     void UpdateProperties()
     {
-        properties.isPlayer = isPlayer;
+        properties.ownerType = ownerType;
         properties.template = template;
+        properties.isAlternateFire = isAlternateFire;
+        properties.isMagnum = isMagnum;
         properties.damage = mainBulletDamage;
         properties.speed = mainBulletSpeed;
         properties.frequency = frequency;
@@ -429,20 +534,51 @@ public class AttackPattern : MonoBehaviour
         Vector2 dir = Vector2.zero;
         Vector2 startPos = (Vector2) owner.position;
 
-        if (isPlayer)
+        if (ownerType == OwnerType.PLAYER)
         {
             bulletTrans = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.PLAYER_MAIN, mainBulletIndex);
 
-            startPos.x += mainBulletOffset.x;
-            startPos.y += (mPlayerController.PlayerSize.y / 2) + mainBulletOffset.y;
-            dir = bulletDirection;
+			startPos.x += mainBulletOffset.x;
+			startPos.y += (mPlayerController.PlayerSize.y / 2) + mainBulletOffset.y;
+			dir = bulletDirection;
+
+			if (isAlternateFire) 
+			{
+				if (alternateFire == AlternateFire.LEFT)
+				{
+					startPos.x -= alternateFireOffset;
+					alternateFire = AlternateFire.RIGHT;
+				}
+				else if (alternateFire == AlternateFire.RIGHT)
+				{
+					startPos.x += alternateFireOffset;
+					alternateFire = AlternateFire.LEFT;
+				}
+                AudioManager.sSingleton.PlayHandgunSfx();
+			}
         }
         else
         {
             bulletTrans = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.ENEMY, mainBulletIndex);
 
-            if (isShootPlayer) dir = (Vector2)(targetTrans.position - owner.position).normalized;
-            else dir = (Vector2)((Vector3)shootDirection - owner.position).normalized;
+            if (isShootPlayer)
+            {
+                if (isFollowPlayer) dir = (Vector2)(targetTrans.position - owner.position).normalized;
+                else if (!isFollowPlayer)
+                {
+                    if (mSavedDir == Vector2.zero) mSavedDir = (Vector2)(targetTrans.position - owner.transform.position).normalized;
+                    dir = mSavedDir;
+                }
+            }
+            else
+            {
+                if (isDirectionFromOwner)
+                {
+                    Vector2 nextPos = (Vector2)owner.position + shootDirection;
+                    dir = (nextPos - (Vector2)owner.position).normalized;
+                }
+                else dir = (Vector2)((Vector3)shootDirection - owner.position).normalized;
+            }
 
             startPos += dir * initialSpacing;
         }
@@ -460,7 +596,7 @@ public class AttackPattern : MonoBehaviour
     void ShootAngleShot(Transform targetTrans)
     {
         Vector2 targetDir = Vector2.zero;
-        if (isPlayer) 
+        if (ownerType == OwnerType.PLAYER) 
         {
             Vector3 temp = transform.position;
             temp.y = bulletDirection.y;
@@ -470,8 +606,24 @@ public class AttackPattern : MonoBehaviour
         }
         else 
         {
-            if (isShootPlayer) targetDir = (Vector2)(targetTrans.position - owner.transform.position).normalized;
-            else targetDir = (Vector2)((Vector3)shootDirection - owner.position).normalized;
+            if (isShootPlayer)
+            {
+                if (isFollowPlayer) targetDir = (Vector2)(targetTrans.position - owner.transform.position).normalized;
+                else if (!isFollowPlayer)
+                {
+                    if (mSavedDir == Vector2.zero) mSavedDir = (Vector2)(targetTrans.position - owner.transform.position).normalized;
+                    targetDir = mSavedDir;
+                }
+            }
+            else
+            {
+                if (isDirectionFromOwner)
+                {
+                    Vector2 nextPos = (Vector2)owner.position + shootDirection;
+                    targetDir = (nextPos - (Vector2)owner.position).normalized;
+                }
+                else targetDir = (Vector2)((Vector3)shootDirection - owner.position).normalized;
+            }
         }
 
         mAngle = Vector2.Angle(targetDir, transform.up) * Mathf.Deg2Rad;
@@ -513,7 +665,7 @@ public class AttackPattern : MonoBehaviour
 //            Debug.DrawLine(transform.position, target, Color.red);
 
             Transform currBullet = null;
-            if (isPlayer) currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.PLAYER_MAIN, mainBulletIndex);
+            if (ownerType == OwnerType.PLAYER) currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.PLAYER_MAIN, mainBulletIndex);
             else currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.ENEMY, mainBulletIndex);
 
             Vector3 dir = (target - (Vector2)transform.position).normalized;
@@ -550,7 +702,7 @@ public class AttackPattern : MonoBehaviour
             else { dir.x += y; dir.y += x; }
 
             Transform currBullet = null;
-            if (isPlayer) currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.PLAYER_MAIN, mainBulletIndex);
+            if (ownerType == OwnerType.PLAYER) currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.PLAYER_MAIN, mainBulletIndex);
             else currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.ENEMY, mainBulletIndex);
 
             currBullet.position = owner.position;
@@ -567,7 +719,7 @@ public class AttackPattern : MonoBehaviour
     void SineWaveShoot(Vector3 targetPos, bool isStartLeft)
     {
         Transform currBullet = null;
-        if (isPlayer) currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.PLAYER_MAIN, mainBulletIndex);
+        if (ownerType == OwnerType.PLAYER) currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.PLAYER_MAIN, mainBulletIndex);
         else currBullet = BulletManager.sSingleton.GetBulletTrans(BulletManager.GroupIndex.ENEMY, mainBulletIndex);
 
         Vector3 temp = owner.position;
@@ -577,11 +729,27 @@ public class AttackPattern : MonoBehaviour
         currBullet.gameObject.SetActive(true);
 
         Vector2 dir = Vector2.zero;
-        if (isPlayer) dir = bulletDirection;
+        if (ownerType == OwnerType.PLAYER) dir = bulletDirection;
         else 
         {
-            if (isShootPlayer) dir = (Vector2) (targetPos - owner.transform.position).normalized;
-            else dir = (Vector2)((Vector3)shootDirection - owner.position).normalized;
+            if (isShootPlayer)
+            {
+                if (isFollowPlayer) dir = (Vector2)(targetPos - owner.transform.position).normalized;
+                else if (!isFollowPlayer)
+                {
+                    if (mSavedDir == Vector2.zero) mSavedDir = (Vector2)(targetPos - owner.transform.position).normalized;
+                    dir = mSavedDir;
+                }
+            }
+            else
+            {
+                if (isDirectionFromOwner)
+                {
+                    Vector2 nextPos = (Vector2)owner.position + shootDirection;
+                    dir = (nextPos - (Vector2)owner.position).normalized;
+                }
+                else dir = (Vector2)((Vector3)shootDirection - owner.position).normalized;
+            }
         }
 
         BulletMove bulletMove = currBullet.GetComponent<BulletMove>();
@@ -595,6 +763,8 @@ public class AttackPattern : MonoBehaviour
         bulletMove.SetBaseProperties(properties);
         bulletMove.SetDirection(dir);
         bulletMove.SetNewBulletSpeed(speedChangeList);
+
+        bulletMove.BulletType = BulletManager.GroupIndex.PLAYER_MAIN;
     }
 
     Vector2 GetCurveAxis(Vector2 dir, bool isStartLeft)
@@ -612,5 +782,10 @@ public class AttackPattern : MonoBehaviour
         else curveAxis = new Vector2(-xVal, -yVal);
 
         return curveAxis;
+    }
+
+    void OnDisable()
+    {
+        mSavedDir = Vector2.zero;
     }
 }

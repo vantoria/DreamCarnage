@@ -1,9 +1,12 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 public static class CoroutineUtil
 {
+    public static bool isCoroutine = false;
+
     public static IEnumerator WaitForRealSeconds(float time)
     {
         float timerPause = 0;
@@ -18,5 +21,13 @@ public static class CoroutineUtil
             }
             yield return null;
         }
+    }
+
+    public static IEnumerator WaitFor(float duration, Action doLast)
+    {
+        isCoroutine = true;
+        yield return new WaitForSeconds(duration);
+        doLast();
+        isCoroutine = false;
     }
 }

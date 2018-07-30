@@ -7,7 +7,9 @@ public class BulletMove : MonoBehaviour
     AttackPattern.Properties properties = new AttackPattern.Properties();
     List<AttackPattern.UpdateSpeed> newChangeList = new List<AttackPattern.UpdateSpeed>();
 
-    Vector2 mCurrPos;
+    BulletManager.GroupIndex groupType = BulletManager.GroupIndex.PLAYER_MAIN;
+
+    Vector2 mStartPos;
     int mCurrChangeIndex = 0;
     float mAngle = 0, mChangeSpeedTimer = 0;
     bool mIsPiercing = false;
@@ -18,7 +20,7 @@ public class BulletMove : MonoBehaviour
 	void Update () 
     {
         float deltaTime = 0;
-        if (properties.isPlayer && BombManager.sSingleton.isTimeStopBomb) deltaTime = Time.unscaledDeltaTime;
+        if (properties.ownerType == AttackPattern.OwnerType.PLAYER && BombManager.sSingleton.isTimeStopBomb) deltaTime = Time.unscaledDeltaTime;
         else deltaTime = Time.deltaTime;
 
         HandleSpeedChange();
@@ -30,8 +32,8 @@ public class BulletMove : MonoBehaviour
         }
         else if (currTemplate == AttackPattern.Template.DOUBLE_SINE_WAVE)
         {
-            mCurrPos += properties.direction * properties.speed * deltaTime;
-            transform.position = (Vector3)mCurrPos + (Vector3)properties.curveAxis * Mathf.Sin (mAngle * properties.frequency) * (properties.magnitude + (mAngle * properties.magExpandMult));
+            mStartPos += properties.direction * properties.speed * deltaTime;
+            transform.position = (Vector3)mStartPos + (Vector3)properties.curveAxis * Mathf.Sin (mAngle * properties.frequency) * (properties.magnitude + (mAngle * properties.magExpandMult));
 
             mAngle += deltaTime;
             if (mAngle >= (Mathf.PI * 2)) mAngle = 0;
@@ -48,8 +50,10 @@ public class BulletMove : MonoBehaviour
 
     public void SetBaseProperties(AttackPattern.Properties properties) 
     { 
-        this.properties.isPlayer = properties.isPlayer; 
+        this.properties.ownerType = properties.ownerType; 
         this.properties.template = properties.template; 
+        this.properties.isAlternateFire = properties.isAlternateFire; 
+        this.properties.isMagnum = properties.isMagnum; 
         this.properties.damage = properties.damage; 
         this.properties.speed = properties.speed; 
         this.properties.frequency = properties.frequency; 
@@ -80,7 +84,7 @@ public class BulletMove : MonoBehaviour
     public void SetIsPiercing(bool isPierce) { mIsPiercing = isPierce; }
     public bool GetIsPiercing() { return mIsPiercing; }
 
-    public void SetPlayer(bool isPlayer) { this.properties.isPlayer = isPlayer; }
+    public void SetPlayer() { this.properties.ownerType = AttackPattern.OwnerType.PLAYER; }
     public void SetShockRepelTarget(Transform target) 
     { 
         mToTarget = target;
@@ -90,6 +94,7 @@ public class BulletMove : MonoBehaviour
     public void SetDirection(Vector2 dir) 
     { 
         properties.direction = dir; 
+        transform.rotation = Quaternion.identity;
 
         // Change the rotation of bullet to match direction.
         float bulletAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
@@ -105,13 +110,20 @@ public class BulletMove : MonoBehaviour
 
     public void SetCurveAxis(Vector2 curveAxis) 
     {
-        mCurrPos = (Vector2) transform.position;
+        mStartPos = (Vector2) transform.position;
         mAngle = 0;
         properties.curveAxis = curveAxis; 
     }
 
+    public BulletManager.GroupIndex BulletType 
+    { 
+        get { return groupType; } 
+        set { groupType = value; }
+    }
+
     public AttackPattern.Properties GetAttackProperties { get { return properties; } }
     public AttackPattern.Template GetTemplate { get { return properties.template; } }
+    public bool GetIsMagnum { get { return properties.isMagnum; } }
     public float GetBulletDamage { get { return properties.damage; } }
     public float GetStatRepelDur { get { return properties.giveStatRepelDur; } }
 

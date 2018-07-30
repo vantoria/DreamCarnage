@@ -45,7 +45,7 @@ public class BulletWipe : MonoBehaviour
         if (!mIsPlay)
         {
             mIsPlay = true;
-            mParticleSys.transform.position = GameManager.sSingleton.player1.position;
+			mParticleSys.transform.position = mBombController.transform.position;
             mParticleSys.Play();
         }
     }

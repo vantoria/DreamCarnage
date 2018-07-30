@@ -9,7 +9,9 @@ public class MoveTowardEnemy : MonoBehaviour
         if (other.tag == TagManager.sSingleton.enemyTag)
         {
             Vector3 dir = (other.transform.position - transform.position).normalized;
-            GetComponentInParent<BulletMove>().SetDirection(dir);
+
+            BulletMove bulletMove = GetComponentInParent<BulletMove>();
+            if (bulletMove != null) bulletMove.SetDirection(dir);
         }
     }
 }

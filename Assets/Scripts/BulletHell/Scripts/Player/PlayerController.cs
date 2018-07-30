@@ -6,6 +6,7 @@ using System;
 public class PlayerController : MonoBehaviour 
 {
     public int playerID = 1;
+    public int characterID = 1;
     public float primaryShootDelay = 0.05f;
     public float secondaryShootDelay = 0.15f;
     public float moveSpeed = 1.0f;
@@ -17,8 +18,14 @@ public class PlayerController : MonoBehaviour
     public int bomb = 2;
     public float powerLevel = 0;
     public float maxPowerLevel = 4;
+	public float scoreMult = 1;
     public float linkValue = 0;
     public float linkMultiplier = 0.5f;
+    public float secondarylinkMultiplier = 0.2f;
+
+    public SpriteRenderer charImageRenderer;
+    public ParticleSystem hitboxPS;
+    public List<ParticleSystem> shotSparksPSList;
 
     public Transform hitBoxTrans;
     public Transform soulTrans;
@@ -53,11 +60,14 @@ public class PlayerController : MonoBehaviour
 	Transform mOtherPlayerTrans;
     Vector3 mPlayerSize, mResetPos, mP1DefaultPos, mP2DefaultPos;
     float mDefaultMoveSpeed, mDisableCtrlTimer, mInvinsibilityTimer;
-	bool mIsShiftPressed = false, mIsChangeAlpha = false, mIsInvinsible = false, mIsWaitOtherInput = false, mIsP1KeybInput = true;
+	bool mIsShiftPressed = false, mIsChangeAlpha = false, mIsInvinsible = false, mIsWaitOtherInput = false;
+    bool mIsP1KeybInput = true, mIsShownPoweredUp = true;
 
     int totalCoroutine = 2;
     List<bool> mIsCoroutineList = new List<bool>();
 
+    Animator anim;
+    ParticleSystem mBrokenHeartPS, mRevivedPS, mDeathPS, mLinkFlame;
     SpriteRenderer sr;
     AttackPattern mAttackPattern;
     SecondaryAttackType mFairy;
@@ -67,9 +77,8 @@ public class PlayerController : MonoBehaviour
 
     void Start () 
     {
-		if (JoystickManager.sSingleton.connectedGamepadCount == 1)
-            mIsP1KeybInput = false;
-
+        mIsP1KeybInput = JoystickManager.sSingleton.IsP1KeybInput;
+            
 		if (playerID == 1) mJoystick = JoystickManager.sSingleton.p1_joystick;
 		else if (playerID == 2) mJoystick = JoystickManager.sSingleton.p2_joystick;
 
@@ -82,7 +91,8 @@ public class PlayerController : MonoBehaviour
         }
 
         mDefaultMoveSpeed = moveSpeed;
-        mPlayerSize = GetComponent<Renderer>().bounds.size;
+        mPlayerSize = GetComponentInChildren<Renderer>().bounds.size;
+        anim = GetComponentInChildren<Animator>();
 
         // Here is the definition of the boundary in world point
         float distance = (transform.position - Camera.main.transform.position).z;
@@ -101,13 +111,11 @@ public class PlayerController : MonoBehaviour
         mP1DefaultPos = GameManager.sSingleton.p1DefaultPos.position;
         mP2DefaultPos = GameManager.sSingleton.p2DefaultPos.position;
 
-        sr = GetComponent<SpriteRenderer>();
+        sr = charImageRenderer;
         mAttackPattern = GetComponent<AttackPattern>();
         mBombController = GetComponent<BombController>();
 
-        // TODO : Delete null.
-        if(soulTrans != null)
-            mPlayerSoul = soulTrans.GetComponent<PlayerSoul>();
+        if(soulTrans != null) mPlayerSoul = soulTrans.GetComponent<PlayerSoul>();
 
         for (int i = 0; i < totalCoroutine; i++)
         { mIsCoroutineList.Add(false); }
@@ -116,35 +124,37 @@ public class PlayerController : MonoBehaviour
         bomb = GameManager.sSingleton.plyStartBomb;
 
         UIManager.sSingleton.UpdatePower(playerID, powerLevel, maxPowerLevel);
-        UIManager.sSingleton.UpdateLinkBar(playerID, linkValue);
+        if (GameManager.sSingleton.TotalNumOfPlayer() == 2) UIManager.sSingleton.UpdateLinkBar(playerID, linkValue);
 
         mFairy = mAttackPattern.secondaryAttackType;
+
+        mBrokenHeartPS = Instantiate(GameManager.sSingleton.brokenHeartPS, Vector3.zero, GameManager.sSingleton.brokenHeartPS.transform.rotation);
+        mRevivedPS = Instantiate(GameManager.sSingleton.revivedPS, Vector3.zero, Quaternion.identity);
+		mDeathPS = Instantiate(GameManager.sSingleton.deathPS, Vector3.zero, Quaternion.identity);
+
+		mLinkFlame = Instantiate(GameManager.sSingleton.linkFlamePS, Vector3.zero, Quaternion.identity);
+		mLinkFlame.transform.position = UIManager.sSingleton.GetLinkBarPos (playerID - 1);
+        mLinkFlame.gameObject.SetActive(false);
 	}
 	
 	void Update () 
     {
-        if (state == State.DEAD || GameManager.sSingleton.currState == GameManager.State.DIALOGUE) return;
+        if (state == State.DEAD || !GameManager.sSingleton.IsMoveDuringDialogue() || !GameManager.sSingleton.IsPlayerInteractable()) return;
 
-		if ( (playerID == 1 &&  ( (mIsP1KeybInput && Input.GetKeyDown(KeyCode.Escape)) || Input.GetKeyDown(mJoystick.pauseKey))) ||
-			( playerID == 2 && (Input.GetKeyDown(KeyCode.KeypadMinus) || Input.GetKeyDown(mJoystick.pauseKey))) )
+        if ( (playerID == 1 &&  ( (mIsP1KeybInput && Input.GetKeyDown(KeyCode.Escape)) || Input.GetKeyDown(mJoystick.startKey))) ||
+            ( playerID == 2 && (Input.GetKeyDown(KeyCode.KeypadMinus) || Input.GetKeyDown(mJoystick.startKey))) )
         {
             if ((playerID == 1 && !UIManager.sSingleton.isPlayer2Pause) ||
                (playerID == 2 && !UIManager.sSingleton.isPlayer1Pause))
             {
-				bool isPauseMenu = UIManager.sSingleton.IsPauseGameOverMenu;
+				bool isPauseMenu = UIManager.sSingleton.IsPause;
 
                 if (!isPauseMenu) UIManager.sSingleton.EnablePauseScreen(playerID);
-                else UIManager.sSingleton.DisablePauseScreen();
+				else UIManager.sSingleton.DisablePauseScreen();
             }
         }
 
-		if (UIManager.sSingleton.IsPauseGameOverMenu) return;
-
-		if (transform.position.y > border.autoCollect) 
-		{
-			if (mOtherPlayerTrans != null && mOtherPlayerTrans.position.y > border.autoCollect) EnvObjManager.sSingleton.MoveAllPUToRandPlayer ();
-			else EnvObjManager.sSingleton.MoveAllPUToPlayer (playerID);
-		}
+        if (UIManager.sSingleton.IsPauseGameOverMenu || UIManager.sSingleton.IsShowScoreRankNameInput) return;
 
         if (mIsInvinsible && !mIsChangeAlpha) StartCoroutine(GetDamagedAlphaChange());
         if (state == State.NORMAL)
@@ -159,8 +169,24 @@ public class PlayerController : MonoBehaviour
                 }
             }
 
-            HandleMovement();
-            HandleAttack();
+            if (transform.position.y > border.autoCollect) 
+            {
+                if (mOtherPlayerTrans != null && mOtherPlayerTrans.position.y > border.autoCollect) EnvObjManager.sSingleton.MoveAllPUToRandPlayer ();
+                else EnvObjManager.sSingleton.MoveAllPUToPlayer (playerID);
+            }
+
+            if (!BombManager.sSingleton.IsPause && !BombManager.sSingleton.IsShooting)
+            {
+                if (bomb == 0 || (mOtherPlayerController != null && mOtherPlayerController.bomb == 0))
+                {
+                    DisableFlamePS();
+                    UIManager.sSingleton.DeactivateBothLinkBar();
+                }
+            }
+
+            if (GameManager.sSingleton.IsMoveDuringDialogue()) HandleMovement();
+			if (!GameManager.sSingleton.IsBossMakeEntrance()) HandleAttack();
+            HandleFocusedMode();
         }
 		else if (state == State.SOUL)
         {
@@ -171,8 +197,7 @@ public class PlayerController : MonoBehaviour
 				if (life > 0) 
 				{
 					MinusLife();
-					ReviveSelf();
-					
+					ReviveSelf(true);
 				}
             }
         }
@@ -191,7 +216,9 @@ public class PlayerController : MonoBehaviour
         }
 	}
 
+    public JoystickManager.JoystickInput GetJoystickInput { get { return mJoystick; } }
     public Vector3 PlayerSize { get { return this.mPlayerSize; } }
+    public bool IsShiftPressed { get { return this.mIsShiftPressed; } }
     public bool IsInvinsible { get { return this.mIsInvinsible; } }
     public bool IsContinueShoot
     {
@@ -216,24 +243,66 @@ public class PlayerController : MonoBehaviour
 
     public void UpdateLinkBar()
     {
-        // TODO : Value to be changed later.
+        if (!IsUpdateLinkBar()) return;
+
         linkValue += 0.01f * linkMultiplier;
-        if (linkValue > 1) linkValue = 1;
-        UIManager.sSingleton.UpdateLinkBar(playerID, linkValue);
+        ShowFlameUpdateUI();
+    }
+
+    public void UpdateLinkBar(float multiplier)
+    {
+        if (!IsUpdateLinkBar()) return;
+
+        linkValue += 0.01f * (linkMultiplier + multiplier);
+        ShowFlameUpdateUI();
+    }
+
+    public void UpdateLinkBarForSecondary()
+    {
+        if (!IsUpdateLinkBar()) return;
+
+        linkValue += 0.01f * secondarylinkMultiplier;
+        ShowFlameUpdateUI();
+    }
+
+    public void UpdateLinkBarForSecondary(float multiplier)
+    {
+        if (!IsUpdateLinkBar()) return;
+
+        linkValue += 0.01f * (secondarylinkMultiplier + multiplier);
+        ShowFlameUpdateUI();
     }
 
     public void ResetLinkBar()
     {
         linkValue = 0;
         UIManager.sSingleton.UpdateLinkBar(playerID, linkValue);
+
+        DisableFlamePS();
     }
 
     public void GetPowerUp(float val)
     {
         if (powerLevel < maxPowerLevel)
         {
+            float prevPowerLevel = powerLevel;
             powerLevel += val;
+
+            if (powerLevel > maxPowerLevel) powerLevel = maxPowerLevel;
             mFairy.UpdateSprite(Mathf.FloorToInt(powerLevel));
+
+            if (Mathf.FloorToInt(powerLevel) >= Mathf.FloorToInt(prevPowerLevel) + 1) mIsShownPoweredUp = false;
+
+            if (!mIsShownPoweredUp)
+            {
+                mIsShownPoweredUp = true;
+
+                Transform powerUpTextTrans = EnvObjManager.sSingleton.GetPowerUpText();
+                powerUpTextTrans.position = transform.position;
+                powerUpTextTrans.gameObject.SetActive(true);
+
+                if (AudioManager.sSingleton != null) AudioManager.sSingleton.PlayPowerLevelUpSfx();
+            }
 
             if (powerLevel > maxPowerLevel) powerLevel = maxPowerLevel;
             UIManager.sSingleton.UpdatePower(playerID, powerLevel, maxPowerLevel);
@@ -266,8 +335,27 @@ public class PlayerController : MonoBehaviour
         UIManager.sSingleton.UpdatePower(playerID, powerLevel, maxPowerLevel);
         BulletManager.sSingleton.DisableEnemyBullets(true);
 
-        if ( (life == 0 && !GameManager.sSingleton.IsTheOtherPlayerAlive (playerID) ||
-            IsFinalSave() && mOtherPlayerController.IsFinalSave()) ) UIManager.sSingleton.EnableGameOverScreen ();
+        // Check for game over status.
+        if ( ((life == 0 && !GameManager.sSingleton.IsTheOtherPlayerActive(playerID)) ||
+            (IsFinalSave() && mOtherPlayerController.IsFinalSave())) )
+        {
+            state = State.DEAD;
+            mPlayerSoul.Deactivate();
+
+            mDeathPS.transform.position = transform.position;
+            mDeathPS.Play();
+
+            if (mOtherPlayerController.state == State.SOUL) mOtherPlayerController.PlayDeathPS();
+
+            UIManager.sSingleton.EnableGameOverScreen();
+        }
+
+        // If only 1 player is left, auto revive self. Do not go into soul mode.
+        if (GameManager.sSingleton.TotalNumOfPlayer() == 1 && life != 0)
+        {
+            ReviveSelf(true);
+            MinusLife();
+        }
     }
 
     public bool IsFinalSave()
@@ -293,51 +381,154 @@ public class PlayerController : MonoBehaviour
 		if (life < 0) 
 		{
 			state = State.DEAD;
+            PlayDeathPS();
+
+            UIManager.sSingleton.GreyOutPlayerUI(playerID);
 			GameManager.sSingleton.DisablePlayer (playerID);
 		}
 	}
 
-    public void ReviveSelf()
+    public void PlayDeathPS()
+    {
+        mDeathPS.transform.position = transform.position;
+        mDeathPS.Play();
+    }
+
+    public void ReviveSelf(bool isSelfRevive)
     {
         state = State.DISABLE_CONTROL;
+
+        if (isSelfRevive)
+        {
+            mBrokenHeartPS.transform.position = transform.position;
+            mBrokenHeartPS.Play();
+        }
+        else if (!isSelfRevive)
+        {
+            scoreMult = GameManager.sSingleton.scoreMultAfterRes;
+            UIManager.sSingleton.UpdateScoreMultiplier(playerID, scoreMult);
+        }
+
+        mRevivedPS.transform.position = transform.position;
+        mRevivedPS.Play();
         transform.position = mResetPos;
+
+        mPlayerSoul.Deactivate();
 
         sr.enabled = true;
         hitBoxTrans.gameObject.SetActive(true);
         spriteBoxTrans.gameObject.SetActive(true);
-        mPlayerSoul.Deactivate();
+    }
+
+    public void UpdateMultiplier(float mult)
+    {
+        scoreMult += mult;
+        UIManager.sSingleton.UpdateScoreMultiplier(playerID, scoreMult);
+    }
+
+    public void DisableFlamePS()
+    {
+        mLinkFlame.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        mLinkFlame.gameObject.SetActive(false);
     }
 
     void HandleMovement()
     {
         if (BombManager.sSingleton.IsPause) return;
 
+        float deltaTime = GameManager.sSingleton.GetDeltaTime();;
         if (playerID == 1)
         {
-            //            // Player 1 only movement.
-            //            if (Input.GetKey(KeyCode.UpArrow)) transform.Translate(Vector3.up * moveSpeed * Time.unscaledDeltaTime);
-            //            if (Input.GetKey(KeyCode.LeftArrow)) transform.Translate(Vector3.left * moveSpeed * Time.unscaledDeltaTime);
-            //            if (Input.GetKey(KeyCode.DownArrow)) transform.Translate(Vector3.down * moveSpeed * Time.unscaledDeltaTime);
-            //            if (Input.GetKey(KeyCode.RightArrow)) transform.Translate(Vector3.right * moveSpeed * Time.unscaledDeltaTime);
+            // Basic keyboard movement.
+            if (mIsP1KeybInput)
+            {
+                if (Input.GetKey(KeyCode.T)) transform.Translate(Vector3.up * moveSpeed * deltaTime);
+                if (Input.GetKey(KeyCode.F))  transform.Translate(Vector3.left * moveSpeed * deltaTime);
+                if (Input.GetKey(KeyCode.G)) transform.Translate(Vector3.down * moveSpeed * deltaTime);
+                if (Input.GetKey(KeyCode.H)) transform.Translate(Vector3.right * moveSpeed * deltaTime);
+            }
+            else
+            {
+                // Joystick movement.
+                float xTranslation = 0, yTranslation = 0;
 
-            // Basic wasd movement.
-			if (mIsP1KeybInput && Input.GetKey(KeyCode.T)) transform.Translate(Vector3.up * moveSpeed * Time.unscaledDeltaTime);
-			if (mIsP1KeybInput && Input.GetKey(KeyCode.F)) transform.Translate(Vector3.left * moveSpeed * Time.unscaledDeltaTime);
-			if (mIsP1KeybInput && Input.GetKey(KeyCode.G)) transform.Translate(Vector3.down * moveSpeed * Time.unscaledDeltaTime);
-			if (mIsP1KeybInput && Input.GetKey(KeyCode.H)) transform.Translate(Vector3.right * moveSpeed * Time.unscaledDeltaTime);
+                float horizontal = Input.GetAxis("HorizontalP1");
+                float vertical = Input.GetAxis("VerticalP1");
+                float horizontalDpad = Input.GetAxis("HorizontalP1Dpad");
+                float verticalDpad = Input.GetAxis("VerticalP1Dpad");
+
+                if (horizontal != 0 || vertical != 0)
+                {
+                    xTranslation = horizontal * moveSpeed * deltaTime;
+                    yTranslation = vertical * moveSpeed * deltaTime;
+                }
+                else if (horizontalDpad != 0 || verticalDpad != 0)
+                {
+                    xTranslation = horizontalDpad * moveSpeed * deltaTime;
+                    yTranslation = -verticalDpad * moveSpeed * deltaTime;
+                }
+
+                // Set the animation.
+                if (anim.GetInteger("State") == 0)
+                {
+                    // Left and right.
+                    if (horizontal < 0 || horizontalDpad < 0) anim.SetInteger("State", 1);  
+                    else if (horizontal > 0 || horizontalDpad > 0) anim.SetInteger("State", 2);  
+                }
+                // If it's in left animation, but player's movement is now right.
+                else if (anim.GetInteger("State") == 1 && (horizontal > 0 || horizontalDpad > 0)) anim.SetInteger("State", 3);  
+                // If it's in right animation, but player's movement is now left.
+                else if (anim.GetInteger("State") == 2 && (horizontal < 0 || horizontalDpad < 0)) anim.SetInteger("State", 4);  
+                else if (horizontal == 0 && horizontalDpad == 0) anim.SetInteger("State", 0);  
+
+                transform.Translate(Vector3.right * xTranslation);
+                transform.Translate(Vector3.up * yTranslation);
+            }
         }
         else if(playerID == 2)
         {
-            // Basic wasd movement.
-            if (Input.GetKey(KeyCode.UpArrow)) transform.Translate(Vector3.up * moveSpeed * Time.unscaledDeltaTime);
-            if (Input.GetKey(KeyCode.LeftArrow)) transform.Translate(Vector3.left * moveSpeed * Time.unscaledDeltaTime);
-            if (Input.GetKey(KeyCode.DownArrow)) transform.Translate(Vector3.down * moveSpeed * Time.unscaledDeltaTime);
-            if (Input.GetKey(KeyCode.RightArrow)) transform.Translate(Vector3.right * moveSpeed * Time.unscaledDeltaTime);
+            // Basic keyboard movement.
+            if (Input.GetKey(KeyCode.UpArrow)) transform.Translate(Vector3.up * moveSpeed * deltaTime);
+            if (Input.GetKey(KeyCode.LeftArrow)) transform.Translate(Vector3.left * moveSpeed * deltaTime);
+            if (Input.GetKey(KeyCode.DownArrow)) transform.Translate(Vector3.down * moveSpeed * deltaTime);
+            if (Input.GetKey(KeyCode.RightArrow)) transform.Translate(Vector3.right * moveSpeed * deltaTime);
+
+            // Joystick movement.
+            float xTranslation = 0, yTranslation = 0;
+
+            float horizontal = Input.GetAxis("HorizontalP2");
+            float vertical = Input.GetAxis("VerticalP2");
+            float horizontalDpad = Input.GetAxis("HorizontalP2Dpad");
+            float verticalDpad = Input.GetAxis("VerticalP2Dpad");
+
+            if (horizontal != 0 || vertical != 0)
+            {
+                xTranslation = horizontal * moveSpeed * deltaTime;
+                yTranslation = vertical * moveSpeed * deltaTime;
+            }
+            else if (horizontalDpad != 0 || verticalDpad != 0)
+            {
+                xTranslation = horizontalDpad * moveSpeed * deltaTime;
+                yTranslation = -verticalDpad * moveSpeed * deltaTime;
+            }
+
+			// Set the animation.
+//			if (anim.GetInteger("State") == 0)
+//			{
+//				// Left and right.
+//				if (horizontal < 0 || horizontalDpad < 0) anim.SetInteger("State", 1);  
+//				else if (horizontal > 0 || horizontalDpad > 0) anim.SetInteger("State", 2);  
+//			}
+//			// If it's in left animation, but player's movement is now right.
+//			else if (anim.GetInteger("State") == 1 && (horizontal > 0 || horizontalDpad > 0)) anim.SetInteger("State", 3);  
+//			// If it's in right animation, but player's movement is now left.
+//			else if (anim.GetInteger("State") == 2 && (horizontal < 0 || horizontalDpad < 0)) anim.SetInteger("State", 4);  
+//			else if (horizontal == 0 && horizontalDpad == 0) anim.SetInteger("State", 0);  
+
+            transform.Translate(Vector3.right * xTranslation);
+            transform.Translate(Vector3.up * yTranslation);
         }
 
-		if (!mIsShiftPressed && ( (playerID == 1 && ((mIsP1KeybInput && Input.GetKey(KeyCode.LeftShift)) || Input.GetKey(mJoystick.slowMoveKey)))
-			|| (playerID == 2 && (Input.GetKey(KeyCode.Comma) || Input.GetKey(mJoystick.slowMoveKey))) )) moveSpeed *= 0.5f; 
-            
         // Prevent player from moving out of screen.
         transform.position = (new Vector3 (
             Mathf.Clamp (transform.position.x, border.left, border.right),
@@ -346,25 +537,42 @@ public class PlayerController : MonoBehaviour
         );
     }
 
-    void HandleAttack()
+    void HandleFocusedMode()
     {
-		if ( ((playerID == 1 && ((mIsP1KeybInput && Input.GetKey(KeyCode.LeftShift)) || Input.GetKey(mJoystick.slowMoveKey))) || 
-			(playerID == 2 && Input.GetKey(KeyCode.Comma)) || Input.GetKey(mJoystick.slowMoveKey) ) && !mIsShiftPressed)
+        if ( ((playerID == 1 && ((mIsP1KeybInput && Input.GetKey(KeyCode.LeftShift)) || Input.GetKey(mJoystick.slowMoveKey))) || 
+            (playerID == 2 && Input.GetKey(KeyCode.Comma)) || Input.GetKey(mJoystick.slowMoveKey) ) && !mIsShiftPressed)
         {
+            moveSpeed *= 0.5f;
+            hitboxPS.Play();
             mFairy.FocusedStance();
             mIsShiftPressed = true;
         }
-		else if ( (playerID == 1 && ((mIsP1KeybInput && Input.GetKeyUp(KeyCode.LeftShift)) || Input.GetKeyUp(mJoystick.slowMoveKey))) ||
-			(playerID == 2 && (Input.GetKeyUp(KeyCode.Comma) || Input.GetKeyUp(mJoystick.slowMoveKey))) ) ResetDefaultSpeed();
+        else if ( (playerID == 1 && ((mIsP1KeybInput && Input.GetKeyUp(KeyCode.LeftShift)) || Input.GetKeyUp(mJoystick.slowMoveKey))) ||
+                  (playerID == 2 && (Input.GetKeyUp(KeyCode.Comma) || Input.GetKeyUp(mJoystick.slowMoveKey))) ) ResetDefaultSpeed();
+    }
 
+    void HandleAttack()
+    {
         if (BombManager.sSingleton.dualLinkState == BombManager.DualLinkState.NONE)
         {
             // Primary attack.
-			if ( (playerID == 1 && (mIsP1KeybInput && Input.GetKey(KeyCode.Z)) || Input.GetKeyUp(mJoystick.fireKey)) || 
-				(playerID == 2 && (Input.GetKey(KeyCode.Period) || Input.GetKeyUp(mJoystick.fireKey))) )
+			if ( (playerID == 1 && (mIsP1KeybInput && Input.GetKey(KeyCode.Z)) || Input.GetKey(mJoystick.fireKey)) || 
+				(playerID == 2 && (Input.GetKey(KeyCode.Period) || Input.GetKey(mJoystick.fireKey))) )
             {
-                if(!mIsCoroutineList[0]) StartCoroutine(DoFirstThenDelay(0, () => mAttackPattern.PrimaryWeaponShoot(), primaryShootDelay));
+                if (!mIsCoroutineList[0])
+                {
+                    BulletSparks();
+                    StartCoroutine(DoFirstThenDelay(0, () => mAttackPattern.PrimaryWeaponShoot(), primaryShootDelay));
+                }
                 if(powerLevel > 0 && !mIsCoroutineList[1]) StartCoroutine(DoFirstThenDelay(1, () => mAttackPattern.SecondaryWeaponShoot(), secondaryShootDelay));
+            }
+            else if( (playerID == 1 && (mIsP1KeybInput && Input.GetKeyUp(KeyCode.Z)) || Input.GetKeyUp(mJoystick.fireKey)) || 
+                (playerID == 2 && (Input.GetKeyUp(KeyCode.Period) || Input.GetKeyUp(mJoystick.fireKey))) )
+            {
+                for (int i = 0; i < shotSparksPSList.Count; i++)
+                {
+                    shotSparksPSList[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
             }
         }
 
@@ -378,14 +586,16 @@ public class PlayerController : MonoBehaviour
                 bomb -= 1;
                 UIManager.sSingleton.UpdateBomb(playerID, bomb);
 
-				if (GameManager.sSingleton.TotalNumOfPlayer() == 2 && mOtherPlayerController.state != State.SOUL)
+                if (GameManager.sSingleton.TotalNumOfPlayer() == 2 && mOtherPlayerController.state != State.SOUL && mOtherPlayerController.state != State.DISABLE_CONTROL)
                 {
                     // The other player receiver during dual link ultimate.
                     if(BombManager.sSingleton.dualLinkState == BombManager.DualLinkState.PLAYER_INPUTTED)
                     {
+                        mIsWaitOtherInput = true;
                         Debug.Log("Activate pause before shooting.");
-                        BombManager.sSingleton.dualLinkState = BombManager.DualLinkState.BOTH_PLAYER_INPUTTED;
+
                         mBombController.ActivatePotrait();
+                        BombManager.sSingleton.BothPlayerInputted();
                     }
 
                     // If both players gauge are full, stop time for input of second player.
@@ -396,7 +606,7 @@ public class PlayerController : MonoBehaviour
                         mBombController.ActivatePotrait();
 
                         mIsWaitOtherInput = true;
-                        BombManager.sSingleton.dualLinkState = BombManager.DualLinkState.PLAYER_INPUTTED;
+                        BombManager.sSingleton.OnePlayerInputted();
                         StartCoroutine (WaitOtherResponseSequence (BombManager.sSingleton.bombDualLinkInputDur));
                     }
                 }
@@ -406,10 +616,20 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void ResetDefaultSpeed() 
-    { 
-        moveSpeed = mDefaultMoveSpeed; 
-        mIsShiftPressed = false;
+    void BulletSparks()
+    {
+        if (mAttackPattern.isAlternateFire)
+        {
+            if (mAttackPattern.GetCurrAlternateFire == AttackPattern.AlternateFire.LEFT) shotSparksPSList[0].Play();
+            else if (mAttackPattern.GetCurrAlternateFire == AttackPattern.AlternateFire.RIGHT) shotSparksPSList[1].Play();
+        }
+        else
+        {
+            for (int i = 0; i < shotSparksPSList.Count; i++)
+            {
+                shotSparksPSList[i].Play();
+            }
+        }
     }
 
     // Drop power down on screen when died.
@@ -433,7 +653,7 @@ public class PlayerController : MonoBehaviour
         float startAngle = angle - halfViewAngle;
         float endAngle = angle + halfViewAngle;
 
-        int segments = GameManager.sSingleton.totalPowerDrop;
+        int segments = GameManager.sSingleton.totalPowerDrop - 1;
         float inc = (dropAngle * Mathf.Deg2Rad) / segments;
 
         float totalAngle = startAngle;
@@ -460,6 +680,33 @@ public class PlayerController : MonoBehaviour
             currPowerUp.GetComponent<EnvironmentalObject>().SetToFlyOut(dir);
             currPowerUp.gameObject.SetActive(true);
         }
+    }
+
+    void ResetDefaultSpeed() 
+    { 
+        hitboxPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        moveSpeed = mDefaultMoveSpeed; 
+        mIsShiftPressed = false;
+    }
+
+    bool IsUpdateLinkBar()
+    {
+        if (bomb == 0 || mOtherPlayerController == null ||
+            (mOtherPlayerController != null && (mOtherPlayerController.bomb == 0 || mOtherPlayerController.state == State.DEAD))) 
+            return false;
+        return true;
+    }
+
+    void ShowFlameUpdateUI()
+    {
+        if (linkValue > 1) linkValue = 1;
+        if (linkValue == 1)
+        {
+            mLinkFlame.gameObject.SetActive(true);
+            mLinkFlame.Play();
+        }
+
+        UIManager.sSingleton.UpdateLinkBar(playerID, linkValue);
     }
 
     IEnumerator DoFirstThenDelay(int index, Action doFirst, float time)
@@ -495,18 +742,27 @@ public class PlayerController : MonoBehaviour
 			// The real dual link activation happens in the bomb manager.
             if (BombManager.sSingleton.dualLinkState == BombManager.DualLinkState.BOTH_PLAYER_INPUTTED) 
 			{
-				mIsWaitOtherInput = false;
+                mIsWaitOtherInput = false;
+                mOtherPlayerController.mIsWaitOtherInput = false;
+
+                mBombController.IsUsingBomb = true;
+                mOtherPlayerController.mBombController.IsUsingBomb = true;
+
 				yield break;
 			}
 
-			timer += Time.unscaledDeltaTime;
+            while (UIManager.sSingleton.IsPauseGameOverMenu)
+            {
+                yield return null;
+            }
+
+            timer += Time.unscaledDeltaTime;
 			yield return null;
 		}
 
 		Time.timeScale = 1;
-		mIsWaitOtherInput = false;
+        mIsWaitOtherInput = false;
         mBombController.ResetDualLinkVal();
-
         mBombController.ActivateBomb();
 		Debug.Log ("Time ended.");
 	}
@@ -530,7 +786,7 @@ public class PlayerController : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-		if (state != State.SOUL)
+        if (state != State.SOUL && state != State.DEAD)
         {
             if (other.tag == TagManager.sSingleton.ENV_OBJ_PowerUp1Tag || other.tag == TagManager.sSingleton.ENV_OBJ_PowerUp2Tag ||
                 other.tag == TagManager.sSingleton.ENV_OBJ_ScorePickUp1Tag || other.tag == TagManager.sSingleton.ENV_OBJ_ScorePickUp2Tag ||

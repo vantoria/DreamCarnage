@@ -5,48 +5,54 @@ using UnityEngine.UI;
 
 public class EnemyHealth : MonoBehaviour 
 {
-    public Transform enemyTrans;
     public float refillBarDuration = 1.5f;
+    public float reduceBarDuration = 0.5f;
 
-    float mRefillBarTimer;
+    public Transform mEnemyTrans;
+
+    bool mIsFillingUp = false;
+    float mFillAmount = -1;
     Image mHpBar;
 
 	void Start () 
     {
-        if (enemyTrans == null)
-            Debug.Log("Enemy health transform is null.");
-
         mHpBar = GetComponent<Image>();
-        if (enemyTrans.gameObject.activeSelf) StartCoroutine(RefillBarSequence(refillBarDuration));
 	}
 	
 	void Update () 
     {
-        if (enemyTrans == null) return;
-        transform.position = enemyTrans.position;
+        if (mEnemyTrans == null) return;
+        transform.position = mEnemyTrans.position;
 	}
 
+    public void SetOwner(Transform trans) { mEnemyTrans = trans; }
+    public void StartHpBarSequence()
+    {
+        if (mEnemyTrans.gameObject.activeSelf) RefillHpBarUI();
+    }
+
+    // Call this when getting shot by player.
     public void UpdateHpBarUI(float currHp, float totalHp)
     {
         float val = currHp / totalHp;
-        mHpBar.fillAmount = val;
+
+        if (!mIsFillingUp) mHpBar.fillAmount = val;
+        else mFillAmount = val;
     }
 
-    public void RefillHpBarUI()
+    // Call this when attack timer is over to reduce it to supposed health.
+    public void ReduceHpBarUI(float fromHp, float toHp, float totalHp)
     {
-        RefillBarSequence(refillBarDuration);
+        StartCoroutine(ReduceBarSequence(reduceBarDuration, fromHp, toHp, totalHp));
     }
 
-    public void RefillHpBarUI(float duration)
-    {
-        RefillBarSequence(duration);
-    }
+    public void RefillHpBarUI() { StartCoroutine(RefillBarSequence(refillBarDuration)); }
+    public void RefillHpBarUI(float duration) { StartCoroutine(RefillBarSequence(duration)); }
 
     IEnumerator RefillBarSequence(float duration)
     {
-        float val = 0;
-        mRefillBarTimer = 0;
-
+        mIsFillingUp = true;
+        float mRefillBarTimer = 0;
         while(mRefillBarTimer < duration)
         {
             float deltaTime = 0;
@@ -54,10 +60,45 @@ public class EnemyHealth : MonoBehaviour
             else deltaTime = Time.deltaTime;
 
             mRefillBarTimer += deltaTime;
-            val = mRefillBarTimer / duration;
+            float val = mRefillBarTimer / duration;
 
             if (val > 1) val = 1;
+            if (mFillAmount != -1 && mFillAmount < val)
+            {
+                mHpBar.fillAmount = mFillAmount;
+                mFillAmount = -1;
+                mIsFillingUp = false;
+                yield break;
+            }
+
             mHpBar.fillAmount = val;
+            yield return null;
+        }
+        mIsFillingUp = false;
+    }
+
+    // Higher val(fromhp) to lower val(toHP).
+    IEnumerator ReduceBarSequence(float duration, float fromHp, float toHp, float totalHp)
+    {
+        float mReduceBarTimer = 0;
+        float difference = fromHp - toHp;
+        float defaultFromHp = fromHp;
+
+        while(mReduceBarTimer < duration)
+        {
+            float deltaTime = 0;
+            if (BombManager.sSingleton.isTimeStopBomb) deltaTime = Time.unscaledDeltaTime;
+            else deltaTime = Time.deltaTime;
+
+            mReduceBarTimer += deltaTime;
+            if (mReduceBarTimer > duration) mReduceBarTimer = duration;
+
+            float valToMinus = mReduceBarTimer / duration * difference;
+            fromHp = defaultFromHp;
+            fromHp -= valToMinus;
+
+            mHpBar.fillAmount = fromHp / totalHp;
+            if (mHpBar.fillAmount > 1) mHpBar.fillAmount = 1;
             yield return null;
         }
     }

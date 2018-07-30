@@ -8,6 +8,7 @@ public class SecondaryAttackType : MonoBehaviour
     {
         ROTATE_AROUND_TARGET = 0,
         FROM_THE_BACK,
+		FIXED_POS_AROUND_TARGET
     }
     public FairyPosition fairyPosition = FairyPosition.ROTATE_AROUND_TARGET;
 
@@ -54,6 +55,7 @@ public class SecondaryAttackType : MonoBehaviour
 
     float defaultRadius = 0;
     int mActivatedFairies = 0;
+    bool mIsP1KeybInput = false;
 
     // Laser properties.
     Transform laserPrefab = null;
@@ -64,8 +66,24 @@ public class SecondaryAttackType : MonoBehaviour
     Vector3 mTarget;
     bool mIsGetPPTarget = false, mIsPPUp = false;
 
-	List<Vector3> mDefaultFairyPos = new List<Vector3>();
-    List<Vector3> mFromBackFocusedPos = new List<Vector3>();
+	List<Vector3> mDefaultFBFairyPos = new List<Vector3>();
+    List<Vector3> mFBFocusedPos = new List<Vector3>();
+
+    // Fixed position around target class.
+    class FPAT_Pos
+    {
+        public int powerLevel;
+        public List<Vector3> posList = new List<Vector3>();
+
+        public FPAT_Pos(int powerLevel, List<Vector3> posList)
+        {
+            this.powerLevel = powerLevel;
+            this.posList = posList;
+        }
+    }
+
+    List<FPAT_Pos> mDefaultFPATFairyPos = new List<FPAT_Pos>();
+    List<FPAT_Pos> mFPATFocusedPos = new List<FPAT_Pos>();
 
     IEnumerator mCurrCo;
     PlayerController mPlayerController;
@@ -73,6 +91,8 @@ public class SecondaryAttackType : MonoBehaviour
 
 	void Start () 
     {
+        mIsP1KeybInput = JoystickManager.sSingleton.IsP1KeybInput;
+
         defaultRadius = radius;
         mPlayerController = GetComponentInParent<PlayerController>();
         mAttackPattern = GetComponentInParent<AttackPattern>();
@@ -90,6 +110,9 @@ public class SecondaryAttackType : MonoBehaviour
                 Transform trans = Instantiate(laserPrefab, transform.position, Quaternion.identity);
                 trans.SetParent(child.transform);
                 trans.localScale = laserPrefab.localScale;
+
+                if (mPlayerController.playerID == 1) trans.tag = TagManager.sSingleton.player1BulletTag;
+                else if (mPlayerController.playerID == 2) trans.tag = TagManager.sSingleton.player2BulletTag;
 
                 Laser laser = trans.GetComponent<Laser>();
                 newFairy = new Fairy(child, laser, tempSr);
@@ -109,15 +132,24 @@ public class SecondaryAttackType : MonoBehaviour
 			for (int i = 0; i < maxPower; i++) 
 			{
 				// Set the initial position to the fairies.
-				mFairyList[i].fairyTrans.localPosition = mDefaultFairyPos[i];
+				mFairyList[i].fairyTrans.localPosition = mDefaultFBFairyPos[i];
 			}
         }
+		else if (fairyPosition == FairyPosition.FIXED_POS_AROUND_TARGET)
+		{
+			// Will always change position as it powered up.
+            SetDefaultPos_FIXED();
+            SetFocusedtPos_FIXED();
+            UpdateFairyDefault_FIXED();
+		}
         
         UpdateSprite(Mathf.FloorToInt(mPlayerController.powerLevel));
 	}
 
     void Update () 
     {
+        if (UIManager.sSingleton.IsPauseGameOverMenu || UIManager.sSingleton.IsShowScoreRankNameInput) return;
+
         if (fairyPosition == FairyPosition.ROTATE_AROUND_TARGET)
         {
             for (int i = 0; i < mFairyList.Count; i++)
@@ -143,6 +175,10 @@ public class SecondaryAttackType : MonoBehaviour
                 mIsPPUp = !mIsPPUp;
             }
         }
+		else if (fairyPosition == FairyPosition.FIXED_POS_AROUND_TARGET)
+		{
+			
+		}
     }
 
     public void SetIsPiercing(bool isPierce) { mIsPiercing = isPierce; }
@@ -171,6 +207,12 @@ public class SecondaryAttackType : MonoBehaviour
             mCurrCo = MoveToFocusedStance_FB();
             StartCoroutine(mCurrCo);
         }
+        else if (fairyPosition == FairyPosition.FIXED_POS_AROUND_TARGET)
+        {
+            if (mCurrCo != null) StopCoroutine(mCurrCo);
+            mCurrCo = MoveToFocusedStance_FPAT();
+            StartCoroutine(mCurrCo);
+        }
     }
 
     public void UpdateSprite(int powerLevel)
@@ -183,6 +225,8 @@ public class SecondaryAttackType : MonoBehaviour
             else mFairyList[i].sr.enabled = false;
         }
         mActivatedFairies = powerLevel;
+
+        if (!IsHoldingButtonFocus() && fairyPosition == FairyPosition.FIXED_POS_AROUND_TARGET) UpdateFairyDefault_FIXED();
     }
 
     public void ActivateSmallLaser(int playerID) 
@@ -242,7 +286,7 @@ public class SecondaryAttackType : MonoBehaviour
             else if (i == 2) pos.x -= offset * 2 + offset;
             else if (i == 3) pos.x += offset * 2 + offset;
 
-			mDefaultFairyPos.Add (pos);
+			mDefaultFBFairyPos.Add (pos);
         }
     }
 
@@ -267,40 +311,156 @@ public class SecondaryAttackType : MonoBehaviour
 			}
 			else if (i == 2) pos.x += -(size.x / 2 + mPlayerController.PlayerSize.x / 2) - offsetFocusedVec2.x;
 			else if (i == 3) pos.x += (size.x / 2 + mPlayerController.PlayerSize.x / 2) + offsetFocusedVec2.x;
-			mFromBackFocusedPos.Add(pos);
+			mFBFocusedPos.Add(pos);
 		}
 	}
 
-    IEnumerator MoveToFocusedStance_RA()
-    {
-        while (((mPlayerController.playerID == 1 && Input.GetKey(KeyCode.LeftShift)) || (mPlayerController.playerID == 2 && Input.GetKey(KeyCode.Comma))) && 
-            mPlayerController.IsContinueShoot)
+	void SetDefaultPos_FIXED()
+	{
+		int maxPower = (int)mPlayerController.maxPowerLevel;
+
+        for (int i = 0; i < maxPower; i++)
         {
+            List<Vector3> posList = new List<Vector3>();
+            Transform currChild = transform.GetChild (i);
+            Vector3 pos = Vector3.zero;
+
+            if (i == 0)
+            {
+                pos = currChild.localPosition;
+                pos.y += 20f;
+                posList.Add(pos);
+                mDefaultFPATFairyPos.Add(new FPAT_Pos(1, posList));
+            }
+            else if (i == 1)
+            {
+                for (int j = 0; j <= i; j++)
+                {
+                    pos = currChild.localPosition;
+
+                    if (j == 0) pos.x += 20f;
+                    else if (j == 1) pos.x -= 20f;
+                    posList.Add(pos);
+                }
+                mDefaultFPATFairyPos.Add(new FPAT_Pos(2, posList));
+            }
+            else if (i == 2) 
+            {
+                for (int j = 0; j <= i; j++)
+                {
+                    pos = currChild.localPosition;
+
+                    if (j == 0) pos.y += 20f;
+                    else if (j == 1) pos.x += 20f;
+                    else if (j == 2) pos.x -= 20f;
+                    posList.Add(pos);
+                }
+                mDefaultFPATFairyPos.Add(new FPAT_Pos(3, posList));
+            }
+            else if (i == 3) 
+            {
+                for (int j = 0; j <= i; j++)
+                {
+                    pos = currChild.localPosition;
+                    if (j == 0) 
+                    {
+                        pos.x += 20f;
+                        pos.y += 8f;
+                    }
+                    else if (j == 1)
+                    {
+                        pos.x -= 20f;
+                        pos.y += 8f;
+                    }
+                    else if (j == 2)
+                    {
+                        pos.x += 20f;
+                        pos.y -= 8f;
+                    }
+                    else if (j == 3)
+                    {
+                        pos.x -= 20f;
+                        pos.y -= 8f;
+                    }
+                    posList.Add(pos);
+                }
+                mDefaultFPATFairyPos.Add(new FPAT_Pos(4, posList));
+            }
+        }
+	}
+
+    void SetFocusedtPos_FIXED()
+    {
+        for (int i = 0; i < mDefaultFPATFairyPos.Count; i++)
+        {
+            FPAT_Pos currFPAT = mDefaultFPATFairyPos[i];
+            List<Vector3> posList = new List<Vector3>();
+
+            for (int j = 0; j < currFPAT.posList.Count; j++)
+            {
+                Vector3 focusedVec = currFPAT.posList[j] * 0.6f;
+                posList.Add(focusedVec);
+            }
+            mFPATFocusedPos.Add(new FPAT_Pos(i + 1, posList));
+        }
+    }
+
+    void UpdateFairyDefault_FIXED()
+    {
+        int currPower = (int)mPlayerController.powerLevel;
+        for (int i = 0; i < currPower; i++)
+        {
+            mFairyList[i].fairyTrans.localPosition = mDefaultFPATFairyPos[currPower - 1].posList[i];
+        }
+    }
+
+    void UpdateFairyFocused_FIXED()
+    {
+        int currPower = (int)mPlayerController.powerLevel;
+        for (int i = 0; i < currPower; i++)
+        {
+            mFairyList[i].fairyTrans.localPosition = mFPATFocusedPos[currPower - 1].posList[i];
+        }
+    }
+
+    IEnumerator MoveToDefaultStance_FB()
+    {
+        float startTime = Time.unscaledTime;
+        float journeyLength = (mFairyList[0].fairyTrans.localPosition - mDefaultFBFairyPos[0]).sqrMagnitude;
+
+        while (mFairyList[0].fairyTrans.localPosition != mDefaultFBFairyPos[0])
+        {
+            if (UIManager.sSingleton.IsShowScoreRankNameInput) yield break;
+
             while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
             {
                 yield return null;
             }
 
-            if (radius != focusedRadius)
+            // Multipy by 200 because putting it into local position.
+            float distCovered = (Time.unscaledTime - startTime) * focusedChangeSpeed * 200;
+            float fracJourney = distCovered / journeyLength;
+
+            if (fracJourney <= 1)
             {
-				float val = Time.unscaledDeltaTime * focusedChangeSpeed;
-                if (radius > focusedRadius) val = -val;
+                for (int i = 0; i < mFairyList.Count; i++) 
+                {
+                    Transform fairy = mFairyList [i].fairyTrans;
+                    Vector3 target = mDefaultFBFairyPos [i];
 
-                radius += val;
-
-                if ((radius < defaultRadius && radius < focusedRadius) || (radius > defaultRadius && radius > focusedRadius)) radius = focusedRadius;
+                    fairy.localPosition = Vector3.Lerp(fairy.localPosition, target, fracJourney);
+                }
             }
             yield return null;
         }
-
-        mCurrCo = MoveToDefaultStance_RA();
-        StartCoroutine(mCurrCo);
     }
 
     IEnumerator MoveToDefaultStance_RA()
     {
         while (radius != defaultRadius)
         {
+            if (UIManager.sSingleton.IsShowScoreRankNameInput) yield break;
+
             while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
             {
                 yield return null;
@@ -316,21 +476,51 @@ public class SecondaryAttackType : MonoBehaviour
         }
     }
 
+    IEnumerator MoveToDefaultStance_FPAT()
+    {
+        float startTime = Time.unscaledTime;
+        float journeyLength = GetFPATJourneyLengthToDefault();
+
+        while (mFairyList[0].fairyTrans.localPosition != mDefaultFPATFairyPos[0].posList[0])
+        {
+            if (UIManager.sSingleton.IsShowScoreRankNameInput) yield break;
+
+            while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
+            {
+                yield return null;
+            }
+
+            // Multipy by 200 because putting it into local position.
+            float distCovered = (Time.unscaledTime - startTime) * focusedChangeSpeed * 200;
+            float fracJourney = distCovered / journeyLength;
+
+            if (fracJourney <= 1)
+            {
+                for (int i = 0; i < mActivatedFairies; i++)
+                {
+                    mFairyList [i].fairyTrans.localPosition = Vector3.Lerp(mFairyList [i].fairyTrans.localPosition, mDefaultFPATFairyPos[mActivatedFairies - 1].posList[i], fracJourney);
+                }
+            }
+            yield return null;
+        }
+    }
+
     IEnumerator MoveToFocusedStance_FB()
     {
-		float startTime = Time.time;
-		float journeyLength = (mFairyList[0].fairyTrans.localPosition - mFromBackFocusedPos [0]).sqrMagnitude;
+		float startTime = Time.unscaledTime;
+		float journeyLength = (mFairyList[0].fairyTrans.localPosition - mFBFocusedPos [0]).sqrMagnitude;
 
-        while(((mPlayerController.playerID == 1 && Input.GetKey(KeyCode.LeftShift)) || (mPlayerController.playerID == 2 && Input.GetKey(KeyCode.Comma))) &&
-            mPlayerController.IsContinueShoot)
+        while (IsHoldingButtonFocus())
 		{
+            if (UIManager.sSingleton.IsShowScoreRankNameInput) yield break;
+
 			while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
 			{
 				yield return null;
 			}
 
 			// Multipy by 200 because putting it into local position.
-			float distCovered = (Time.time - startTime) * focusedChangeSpeed * 200;
+			float distCovered = (Time.unscaledTime - startTime) * focusedChangeSpeed * 200;
 			float fracJourney = distCovered / journeyLength;
 
 			if (fracJourney <= 1)
@@ -338,7 +528,7 @@ public class SecondaryAttackType : MonoBehaviour
 				for (int i = 0; i < mFairyList.Count; i++) 
 				{
 					Transform fairy = mFairyList [i].fairyTrans;
-					Vector3 target = mFromBackFocusedPos [i];
+					Vector3 target = mFBFocusedPos [i];
 
 					fairy.localPosition = Vector3.Lerp(fairy.localPosition, target, fracJourney);
 				}
@@ -350,34 +540,102 @@ public class SecondaryAttackType : MonoBehaviour
 		StartCoroutine(mCurrCo);
     }
 
-	IEnumerator MoveToDefaultStance_FB()
-	{
-		float startTime = Time.time;
-		float journeyLength = (mFairyList[0].fairyTrans.localPosition - mDefaultFairyPos[0]).sqrMagnitude;
 
-		while (mFairyList[0].fairyTrans.localPosition != mDefaultFairyPos[0])
-		{
-			while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
-			{
-				yield return null;
-			}
+    IEnumerator MoveToFocusedStance_RA()
+    {
+        while (IsHoldingButtonFocus())
+        {
+            if (UIManager.sSingleton.IsShowScoreRankNameInput) yield break;
 
-			// Multipy by 200 because putting it into local position.
-			float distCovered = (Time.time - startTime) * focusedChangeSpeed * 200;
-			float fracJourney = distCovered / journeyLength;
+            while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
+            {
+                yield return null;
+            }
 
-			if (fracJourney <= 1)
-			{
-				for (int i = 0; i < mFairyList.Count; i++) 
-				{
-					Transform fairy = mFairyList [i].fairyTrans;
-					Vector3 target = mDefaultFairyPos [i];
+            if (radius != focusedRadius)
+            {
+                float val = Time.unscaledDeltaTime * focusedChangeSpeed;
+                if (radius > focusedRadius) val = -val;
 
-					fairy.localPosition = Vector3.Lerp(fairy.localPosition, target, fracJourney);
-				}
-			}
-			yield return null;
-		}
-	}
+                radius += val;
 
+                if ((radius < defaultRadius && radius < focusedRadius) || (radius > defaultRadius && radius > focusedRadius)) radius = focusedRadius;
+            }
+            yield return null;
+        }
+
+        mCurrCo = MoveToDefaultStance_RA();
+        StartCoroutine(mCurrCo);
+    }
+
+    IEnumerator MoveToFocusedStance_FPAT()
+    {
+        float startTime = Time.unscaledTime;
+        float journeyLength = GetFPATJourneyLengthToFocus();
+        int prevActivatedFairies = mActivatedFairies;
+
+        while (IsHoldingButtonFocus())
+        {
+            if (UIManager.sSingleton.IsShowScoreRankNameInput) yield break;
+
+            while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
+            {
+                yield return null;
+            }
+
+            // Multipy by 200 because putting it into local position.
+            float distCovered = (Time.unscaledTime - startTime) * focusedChangeSpeed * 200;
+            float fracJourney = distCovered / journeyLength;
+
+            if (fracJourney <= 1)
+            {
+                for (int i = 0; i < mActivatedFairies; i++)
+                {
+                    mFairyList [i].fairyTrans.localPosition = Vector3.Lerp(mFairyList [i].fairyTrans.localPosition, mFPATFocusedPos[mActivatedFairies - 1].posList[i], fracJourney);
+                }
+            }
+            else if (fracJourney > 1 && prevActivatedFairies != mActivatedFairies)
+            {
+                for (int i = 0; i < mActivatedFairies; i++)
+                {
+                    mFairyList[i].fairyTrans.localPosition = mFPATFocusedPos[mActivatedFairies - 1].posList[i];
+                }
+            }
+
+            prevActivatedFairies = mActivatedFairies;
+            yield return null;
+        }
+
+        mCurrCo = MoveToDefaultStance_FPAT();
+        StartCoroutine(mCurrCo);
+    }
+
+    float GetFPATJourneyLengthToDefault()
+    {
+        float journeyLength = 0;
+        if (mActivatedFairies == 1 || mActivatedFairies == 3) journeyLength = (mFPATFocusedPos[0].posList[0] - mDefaultFPATFairyPos [0].posList[0]).sqrMagnitude;
+        else if (mActivatedFairies == 2) journeyLength = (mFPATFocusedPos[1].posList[0] - mDefaultFPATFairyPos [1].posList[0]).sqrMagnitude;
+        else if (mActivatedFairies == 4) journeyLength = (mFPATFocusedPos[3].posList[0] - mDefaultFPATFairyPos [3].posList[0]).sqrMagnitude;
+
+        return journeyLength;
+    }
+
+    float GetFPATJourneyLengthToFocus()
+    {
+        float journeyLength = 0;
+        if (mActivatedFairies == 1 || mActivatedFairies == 3) journeyLength = (mDefaultFPATFairyPos[0].posList[0] - mFPATFocusedPos [0].posList[0]).sqrMagnitude;
+        else if (mActivatedFairies == 2) journeyLength = (mDefaultFPATFairyPos[1].posList[0] - mFPATFocusedPos [1].posList[0]).sqrMagnitude;
+        else if (mActivatedFairies == 4) journeyLength = (mDefaultFPATFairyPos[3].posList[0] - mFPATFocusedPos [3].posList[0]).sqrMagnitude;
+
+        return journeyLength;
+    }
+
+    bool IsHoldingButtonFocus()
+    {
+        if (((mPlayerController.playerID == 1 && ((mIsP1KeybInput && Input.GetKey(KeyCode.LeftShift)) || Input.GetKey(mPlayerController.GetJoystickInput.slowMoveKey))) ||
+            (mPlayerController.playerID == 2 && (Input.GetKey(KeyCode.Comma) || Input.GetKey(mPlayerController.GetJoystickInput.slowMoveKey)))) &&
+            mPlayerController.IsContinueShoot)
+            return true;
+        return false;
+    }
 }

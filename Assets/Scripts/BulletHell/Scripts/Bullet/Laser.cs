@@ -48,10 +48,22 @@ public class Laser : MonoBehaviour
     IEnumerator ExpandSequence(int playerID)
     {
         mIsFiring = true;
-        while (((playerID == 1 && Input.GetKey(KeyCode.Z)) || (playerID == 2 && Input.GetKey(KeyCode.Period))) && 
-            mPlayerController.IsContinueShoot && !BombManager.sSingleton.IsShooting)
+        while ( ((playerID == 1 && (Input.GetKey(KeyCode.Z) || Input.GetKey(mPlayerController.GetJoystickInput.fireKey))) || 
+            (playerID == 2 && (Input.GetKey(KeyCode.Period) || Input.GetKey(mPlayerController.GetJoystickInput.fireKey))) ) && 
+			mPlayerController.IsContinueShoot && !BombManager.sSingleton.IsShooting)
         {
-            while (UIManager.sSingleton.IsPauseGameOverMenu)
+            if (UIManager.sSingleton.IsShowScoreRankNameInput) yield break;
+
+			if (GameManager.sSingleton.IsBossMakeEntrance ()) 
+			{
+				mIsFiring = false;
+				if (!mPlayerController.IsContinueShoot) boxCollider.enabled = false;
+				mCurrCo = ShrinkSequence();
+				StartCoroutine(mCurrCo);
+				yield break;
+			}
+
+            while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
             {
                 yield return null;
             }
@@ -59,7 +71,7 @@ public class Laser : MonoBehaviour
             if (transform.localScale.x != expandTillXScale)
             {
                 Vector3 scale = transform.localScale;
-                scale.x += Time.deltaTime * expandSpeed;
+				scale.x += Time.unscaledDeltaTime * expandSpeed;
 
                 if (scale.x > expandTillXScale) scale.x = expandTillXScale;
                 transform.localScale = scale;
@@ -79,13 +91,15 @@ public class Laser : MonoBehaviour
     {
         while (transform.localScale.x != mDefaultXScale)
         {
-            while (UIManager.sSingleton.IsPauseGameOverMenu)
+            if (UIManager.sSingleton.IsShowScoreRankNameInput) yield break;
+
+            while (UIManager.sSingleton.IsPauseGameOverMenu || BombManager.sSingleton.IsPause)
             {
                 yield return null;
             }
 
             Vector3 scale = transform.localScale;
-            scale.x -= Time.deltaTime * expandSpeed;
+			scale.x -= Time.unscaledDeltaTime * expandSpeed;
 
             if (scale.x < mDefaultXScale) scale.x = mDefaultXScale;
             transform.localScale = scale;

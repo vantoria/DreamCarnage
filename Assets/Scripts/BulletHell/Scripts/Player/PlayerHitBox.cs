@@ -41,6 +41,8 @@ public class PlayerHitBox : MonoBehaviour
 			int val = (int)other.GetComponent<EnvironmentalObject>().value;
 			mPlayerController.UpdateScore (val);
             other.gameObject.SetActive(false);
+
+            if (AudioManager.sSingleton != null) AudioManager.sSingleton.PlayCoinGetSfx();
         }
     }
 

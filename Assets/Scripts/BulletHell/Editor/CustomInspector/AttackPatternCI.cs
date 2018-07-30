@@ -23,20 +23,31 @@ public class AttackPatternCI : Editor
         EditorGUILayout.LabelField("Base Stat");
         GUILayout.EndVertical ();
 
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("isPlayer"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("ownerType"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("owner"));
 
-        if (mSelf.isPlayer)
+        if (mSelf.ownerType == AttackPattern.OwnerType.PLAYER)
         {
             GUILayout.Space(5);
             EditorGUILayout.LabelField("Primary Weapon");
         }
 
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("isMainPiercing"));
+		EditorGUILayout.PropertyField(serializedObject.FindProperty("isMainPiercing"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("isAlternateFire"));
+		EditorGUILayout.PropertyField(serializedObject.FindProperty("isMagnum"));
+        if (mSelf.isMagnum)
+        {
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("magnumMarkedDuration"));
+        }
+
+		if (mSelf.isAlternateFire) EditorGUILayout.PropertyField(serializedObject.FindProperty("alternateFireOffset"));
+
         EditorGUILayout.PropertyField(serializedObject.FindProperty("mainBulletDamage"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("mainBulletSpeed"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("pauseEverySec"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("pauseDur"));
 
-        if (mSelf.isPlayer)
+        if (mSelf.ownerType == AttackPattern.OwnerType.PLAYER)
         {
             EditorGUILayout.PropertyField(serializedObject.FindProperty("mainBulletOffset"));
 
@@ -52,6 +63,7 @@ public class AttackPatternCI : Editor
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("secondaryBulletDamage"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("secondaryBulletSpeed"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("bulletDirection"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("secondaryBulletOffset"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("withinRange"));
             }
             else if (mSelf.bulletType == AttackPattern.BulletType.LASER)
@@ -62,7 +74,7 @@ public class AttackPatternCI : Editor
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("isDestroyBullets"));
             }
         }
-        else if (!mSelf.isPlayer)
+        else if (mSelf.ownerType != AttackPattern.OwnerType.PLAYER)
         {
             EditorGUILayout.PropertyField(serializedObject.FindProperty("shootDelay")); 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("hpPercentSkipAtk")); 
@@ -79,7 +91,7 @@ public class AttackPatternCI : Editor
             BulletPrefabData currBulletData = BulletManager.sSingleton.bulletPrefabData;
 
             Texture2D mainTexture = null, secondaryTexture = null;
-            if (mSelf.isPlayer)
+            if (mSelf.ownerType == AttackPattern.OwnerType.PLAYER)
             {
                 Transform mainBullet = currBulletData.plyMainBulletTransList[mSelf.mainBulletIndex];
                 Transform secondaryBullet = null;
@@ -100,8 +112,8 @@ public class AttackPatternCI : Editor
                     if (totalIndex >= 0) secondaryBullet = currBulletData.plyLaserTransNoCacheList[mSelf.secondaryBulletIndex];
                 }
 
-                mainTexture = mainBullet.GetComponent<SpriteRenderer>().sprite.texture;
-                secondaryTexture = secondaryBullet.GetComponent<SpriteRenderer>().sprite.texture;
+                mainTexture = mainBullet.GetComponentInChildren<SpriteRenderer>().sprite.texture;
+                secondaryTexture = secondaryBullet.GetComponentInChildren<SpriteRenderer>().sprite.texture;
             }
             else mainTexture = currBulletData.enemyBulletTransList[mSelf.mainBulletIndex].GetComponent<SpriteRenderer>().sprite.texture;
 
@@ -111,7 +123,7 @@ public class AttackPatternCI : Editor
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.FlexibleSpace();
-                if (mSelf.isPlayer)
+                if (mSelf.ownerType == AttackPattern.OwnerType.PLAYER)
                 {
                     GUILayout.Space(20);
                     GUILayout.Label("Primary bullet");
@@ -142,7 +154,7 @@ public class AttackPatternCI : Editor
                 GUI.enabled = true;
 
                 int max = 0;
-                if (mSelf.isPlayer) max = currBulletData.plyMainBulletTransList.Count - 1;
+                if (mSelf.ownerType == AttackPattern.OwnerType.PLAYER) max = currBulletData.plyMainBulletTransList.Count - 1;
                 else max = currBulletData.enemyBulletTransList.Count - 1;
 
                 if(mSelf.mainBulletIndex + 1 > max) GUI.enabled = false;
@@ -161,7 +173,7 @@ public class AttackPatternCI : Editor
 					secondaryTotal = currBulletData.plySecondaryBulletTransList.Count;
                 else if (mSelf.bulletType == AttackPattern.BulletType.LASER) secondaryTotal = currBulletData.plyLaserTransNoCacheList.Count;
 
-                if (mSelf.isPlayer)
+                if (mSelf.ownerType == AttackPattern.OwnerType.PLAYER)
                 {
                     GUILayout.BeginVertical();
                     GUILayout.Space(20);
@@ -195,7 +207,7 @@ public class AttackPatternCI : Editor
 
                 GUILayout.BeginHorizontal();
                 GUILayout.FlexibleSpace();
-                if (mSelf.isPlayer)
+                if (mSelf.ownerType == AttackPattern.OwnerType.PLAYER)
                 {
                     GUILayout.Space(12);
                     GUILayout.Label((mSelf.mainBulletIndex + 1).ToString() + " / " + currBulletData.plyMainBulletTransList.Count.ToString());
@@ -225,22 +237,38 @@ public class AttackPatternCI : Editor
 
         if (mSelf.template == AttackPattern.Template.SINGLE_SHOT)
         {
-            if (!mSelf.isPlayer)
+            if (mSelf.ownerType != AttackPattern.OwnerType.PLAYER)
             {
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("isShootPlayer"));
-                if (mSelf.isShootPlayer) EditorGUILayout.PropertyField(serializedObject.FindProperty("target"));
-                if (!mSelf.isShootPlayer) EditorGUILayout.PropertyField(serializedObject.FindProperty("shootDirection"));
+                if (mSelf.isShootPlayer)
+                {
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("isFollowPlayer"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("target"));
+                }
+                if (!mSelf.isShootPlayer)
+                {
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("isDirectionFromOwner"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("shootDirection"));
+                }
             }
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("initialSpacing"));
         }
         else if (mSelf.template == AttackPattern.Template.ANGLE_SHOT)
         {
-            if (!mSelf.isPlayer)
+            if (mSelf.ownerType != AttackPattern.OwnerType.PLAYER)
             {
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("isShootPlayer"));
-                if (mSelf.isShootPlayer) EditorGUILayout.PropertyField(serializedObject.FindProperty("target"));
-                if (!mSelf.isShootPlayer) EditorGUILayout.PropertyField(serializedObject.FindProperty("shootDirection"));
+                if (mSelf.isShootPlayer)
+                {
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("isFollowPlayer"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("target"));
+                }
+                if (!mSelf.isShootPlayer)
+                {
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("isDirectionFromOwner"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("shootDirection"));
+                }
             }
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("initialSpacing"));
@@ -266,11 +294,19 @@ public class AttackPatternCI : Editor
         }
         else if (mSelf.template == AttackPattern.Template.DOUBLE_SINE_WAVE)
         {
-            if (!mSelf.isPlayer)
+            if (mSelf.ownerType != AttackPattern.OwnerType.PLAYER)
             {
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("isShootPlayer"));
-                if (mSelf.isShootPlayer) EditorGUILayout.PropertyField(serializedObject.FindProperty("target"));
-                if (!mSelf.isShootPlayer) EditorGUILayout.PropertyField(serializedObject.FindProperty("shootDirection"));
+                if (mSelf.isShootPlayer)
+                {
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("isFollowPlayer"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("target"));
+                }
+                if (!mSelf.isShootPlayer)
+                {
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("isDirectionFromOwner"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("shootDirection"));
+                }
             }
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("offsetPosition"));
@@ -295,7 +331,7 @@ public class AttackPatternCI : Editor
 			EditorGUILayout.PropertyField(serializedObject.FindProperty("trapFadeSpd"));
         }
 
-        if (!mSelf.isPlayer)
+        if (mSelf.ownerType != AttackPattern.OwnerType.PLAYER)
         {
             EditorGUILayout.PropertyField(serializedObject.FindProperty("speedChangeList"), true);
             GUILayout.BeginVertical("HelpBox");

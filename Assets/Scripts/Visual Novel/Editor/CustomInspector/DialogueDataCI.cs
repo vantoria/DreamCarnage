@@ -147,6 +147,7 @@ public class DialogueDataCI : Editor
                     UpdateTotalWhenSwappingName(currCharName.ToString(), prevSelectedName.ToString());
                     SetCharacterDirectionFromOthers(currDialogue);
                     mSelf.UpdateSpriteList(i, currCharName);
+                    mSelf.UpdateCharacterInfo(ref currDialogue.character);
                 }
                 SetMessedUpMessage();
             }
